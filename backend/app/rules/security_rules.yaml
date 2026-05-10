@@ -1,0 +1,225 @@
+- id: R001
+  name: 敏感凭证读取
+  category: 隐私泄露
+  type: node
+  condition:
+    action: ["read"]
+    data_type: ["credential", "password", "token", "api_key"]
+  score: 35
+  level: high
+  advice: 禁止 Agent 访问凭证类数据，除非存在明确授权和审计记录。
+
+- id: R002
+  name: 敏感数据外发
+  category: 数据外传
+  type: node
+  condition:
+    action: ["send", "upload"]
+    data_type: ["credential", "password", "token", "api_key", "personal_info"]
+    destination: ["external", "unknown"]
+  score: 40
+  level: high
+  advice: 禁止将敏感数据发送到外部目标。
+
+- id: R003
+  name: 危险系统命令
+  category: 系统安全
+  type: node
+  condition:
+    tool: ["shell"]
+    action: ["execute"]
+  score: 35
+  level: high
+  advice: 对 shell 命令执行增加白名单限制。
+
+- id: R004
+  name: 未授权账号访问
+  category: 越权访问
+  type: node
+  condition:
+    permission: ["unauthorized"]
+  score: 40
+  level: high
+  advice: 验证操作是否经过授权，禁止访问他人账号。
+
+- id: R005
+  name: Prompt Injection 指令
+  category: 提示词注入
+  type: node
+  condition:
+    tool: ["llm"]
+    action: ["override"]
+  score: 35
+  level: high
+  advice: 检测到提示词注入意图，建议加强 Prompt 防护。
+
+- id: R006
+  name: 系统提示词泄露
+  category: 模型安全
+  type: node
+  condition:
+    tool: ["llm"]
+    action: ["leak"]
+  score: 40
+  level: high
+  advice: 防止系统提示词和内部指令泄露。
+
+- id: R007
+  name: 个人信息批量处理
+  category: 隐私风险
+  type: node
+  condition:
+    action: ["read", "query"]
+    data_type: ["personal_info"]
+  score: 30
+  level: medium
+  advice: 对个人信息处理增加合规检查。
+
+- id: R008
+  name: 删除系统文件
+  category: 系统破坏
+  type: node
+  condition:
+    action: ["delete"]
+    data_type: ["system_file"]
+  score: 45
+  level: critical
+  advice: 禁止 Agent 删除系统文件。
+
+- id: R009
+  name: 远程脚本执行意图
+  category: 代码执行
+  type: node
+  condition:
+    action: ["download", "execute"]
+    tool: ["shell", "network"]
+  score: 40
+  level: high
+  advice: 禁止下载并执行远程脚本。
+
+- id: R010
+  name: 未知外部目标通信
+  category: 网络风险
+  type: node
+  condition:
+    action: ["send", "upload"]
+    destination: ["external", "unknown"]
+  score: 25
+  level: medium
+  advice: 对外部通信增加目标白名单。
+
+- id: R011
+  name: 数据库高危操作
+  category: 数据安全
+  type: node
+  condition:
+    tool: ["database"]
+    action: ["delete", "execute"]
+  score: 50
+  level: critical
+  advice: 对数据库高危操作增加二次确认。
+
+- id: R012
+  name: 日志清除或审计绕过
+  category: 审计风险
+  type: node
+  condition:
+    action: ["delete"]
+    data_type: ["system_file", "database_record"]
+  score: 40
+  level: high
+  advice: 防止日志清除和审计绕过行为。
+
+- id: R013
+  name: 安全策略关闭
+  category: 安全绕过
+  type: node
+  condition:
+    action: ["modify", "override"]
+    tool: ["shell", "code"]
+  score: 35
+  level: high
+  advice: 防止安全策略被关闭或绕过。
+
+- id: R014
+  name: 内网地址访问意图
+  category: 网络风险
+  type: node
+  condition:
+    action: ["read", "crawl", "query"]
+    tool: ["network"]
+  score: 25
+  level: medium
+  advice: 限制 Agent 对内网资源的访问。
+
+- id: R015
+  name: 未受信软件包安装
+  category: 供应链风险
+  type: node
+  condition:
+    action: ["download", "execute"]
+    tool: ["shell"]
+  score: 30
+  level: medium
+  advice: 禁止安装未经验证的软件包。
+
+- id: R016
+  name: 代码中硬编码密钥
+  category: 密钥安全
+  type: node
+  condition:
+    action: ["write", "modify"]
+    data_type: ["api_key", "token", "password"]
+    tool: ["code"]
+  score: 35
+  level: high
+  advice: 禁止在代码中硬编码密钥和凭证。
+
+- id: R017
+  name: 越权读取他人数据
+  category: 越权访问
+  type: node
+  condition:
+    action: ["read", "query"]
+    data_type: ["personal_info", "database_record"]
+    permission: ["unauthorized"]
+  score: 40
+  level: high
+  advice: 禁止越权读取他人数据。
+
+- id: R018
+  name: 模型越狱或角色劫持
+  category: 提示词注入
+  type: node
+  condition:
+    tool: ["llm"]
+    action: ["override", "leak"]
+  score: 40
+  level: high
+  advice: 检测到模型越狱或角色劫持意图。
+
+- id: R019
+  name: 敏感凭证读取后外发
+  category: 高危组合
+  type: chain
+  sequence:
+    - action: ["read"]
+      data_type: ["credential", "password", "token", "api_key"]
+    - action: ["send", "upload"]
+      destination: ["external", "unknown"]
+  score: 45
+  level: critical
+  advice: 阻断读取敏感凭证并外发的组合行为。
+
+- id: R020
+  name: 下载脚本后执行
+  category: 高危组合
+  type: chain
+  sequence:
+    - action: ["download"]
+      tool: ["shell", "network"]
+    - action: ["execute"]
+      tool: ["shell"]
+  score: 40
+  level: critical
+  advice: 阻断下载外部脚本并执行的组合行为。
