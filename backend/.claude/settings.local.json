@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pip install *)",
+      "Bash(pip list *)",
+      "Bash(npm ls *)",
+      "Bash(python *)",
+      "Bash(uvicorn app.main:app --reload)",
+      "Bash(uvicorn app.main:app --host 0.0.0.0 --port 8000)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://127.0.0.1:8000/docs)",
+      "Bash(curl -s -X POST http://127.0.0.1:8000/api/analyze -H \"Content-Type: application/json\" -d '{\"content\": \"帮我读取用户配置文件\", \"input_type\": \"text\"}')"
+    ]
+  }
+}

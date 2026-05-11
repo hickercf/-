@@ -2,11 +2,11 @@
   "summary": {
     "total": 30,
     "extraction_success_rate": 1.0,
-    "risk_level_accuracy": 0.5333,
-    "high_risk_recall": 0.75,
-    "critical_miss_count": 6,
-    "category_f1": 0.5,
-    "avg_response_time": 3.945,
+    "risk_level_accuracy": 0.5667,
+    "high_risk_recall": 0.7917,
+    "critical_miss_count": 5,
+    "category_f1": 0.5294,
+    "avg_response_time": 4.079,
     "comparison": {
       "rule_only": {
         "total": 30,
@@ -15,25 +15,25 @@
         "high_risk_recall": 0.375,
         "critical_miss_count": 15,
         "category_f1": 0.5783,
-        "avg_response_time": 0.0
+        "avg_response_time": 0.001
       },
       "llm_only": {
         "total": 30,
         "extraction_success_rate": 1.0,
-        "risk_level_accuracy": 0.3,
+        "risk_level_accuracy": 0.3333,
         "high_risk_recall": 0.5417,
         "critical_miss_count": 11,
         "category_f1": 0.4444,
-        "avg_response_time": 4.05
+        "avg_response_time": 3.937
       },
       "fusion": {
         "total": 30,
         "extraction_success_rate": 1.0,
-        "risk_level_accuracy": 0.5333,
-        "high_risk_recall": 0.75,
-        "critical_miss_count": 6,
-        "category_f1": 0.5,
-        "avg_response_time": 3.945
+        "risk_level_accuracy": 0.5667,
+        "high_risk_recall": 0.7917,
+        "critical_miss_count": 5,
+        "category_f1": 0.5294,
+        "avg_response_time": 4.079
       }
     }
   },
@@ -45,25 +45,25 @@
       "high_risk_recall": 0.375,
       "critical_miss_count": 15,
       "category_f1": 0.5783,
-      "avg_response_time": 0.0
+      "avg_response_time": 0.001
     },
     "llm_only": {
       "total": 30,
       "extraction_success_rate": 1.0,
-      "risk_level_accuracy": 0.3,
+      "risk_level_accuracy": 0.3333,
       "high_risk_recall": 0.5417,
       "critical_miss_count": 11,
       "category_f1": 0.4444,
-      "avg_response_time": 4.05
+      "avg_response_time": 3.937
     },
     "fusion": {
       "total": 30,
       "extraction_success_rate": 1.0,
-      "risk_level_accuracy": 0.5333,
-      "high_risk_recall": 0.75,
-      "critical_miss_count": 6,
-      "category_f1": 0.5,
-      "avg_response_time": 3.945
+      "risk_level_accuracy": 0.5667,
+      "high_risk_recall": 0.7917,
+      "critical_miss_count": 5,
+      "category_f1": 0.5294,
+      "avg_response_time": 4.079
     }
   }
 }

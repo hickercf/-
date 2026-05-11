@@ -2,8 +2,8 @@
   <div class="app">
     <header class="header">
       <div class="header-left">
-        <h1 class="logo">AgentGuard</h1>
-        <span class="subtitle">AI Agent 零信任安全审计平台</span>
+        <h1 class="logo">AgentFuzzer</h1>
+        <span class="subtitle">AI Agent 自动化漏洞扫描沙箱</span>
       </div>
       <nav class="nav">
         <button
@@ -15,8 +15,9 @@
       </nav>
     </header>
     <main class="main">
+      <TargetPage v-if="activeTab === 'targets'" />
+      <ScanConsolePage v-if="activeTab === 'scan'" />
       <AnalyzePage v-if="activeTab === 'analyze'" />
-      <HistoryPage v-if="activeTab === 'history'" />
       <StatsPage v-if="activeTab === 'stats'" />
       <ReportPage v-if="activeTab === 'report'" />
       <EvalPage v-if="activeTab === 'eval'" />
@@ -31,15 +32,18 @@ import HistoryPage from './pages/History.vue'
 import StatsPage from './pages/Stats.vue'
 import ReportPage from './pages/Report.vue'
 import EvalPage from './pages/Evaluation.vue'
+import TargetPage from './pages/TargetPage.vue'
+import ScanConsolePage from './pages/ScanConsole.vue'
 
 export default {
   name: 'App',
-  components: { AnalyzePage, HistoryPage, StatsPage, ReportPage, EvalPage },
+  components: { AnalyzePage, HistoryPage, StatsPage, ReportPage, EvalPage, TargetPage, ScanConsolePage },
   setup() {
-    const activeTab = ref('analyze')
+    const activeTab = ref('targets')
     const tabs = [
-      { key: 'analyze', label: '审计台' },
-      { key: 'history', label: '历史记录' },
+      { key: 'targets', label: '靶标管理' },
+      { key: 'scan', label: '扫描控制台' },
+      { key: 'analyze', label: '快速审计' },
       { key: 'stats', label: '统计图表' },
       { key: 'report', label: '可信报告' },
       { key: 'eval', label: '评测结果' },
@@ -59,11 +63,11 @@ export default {
 .header-left { display: flex; align-items: baseline; gap: 12px; }
 .logo { font-size: 22px; font-weight: 700; letter-spacing: 1px; }
 .subtitle { font-size: 13px; opacity: 0.7; }
-.nav { display: flex; gap: 4px; }
+.nav { display: flex; gap: 4px; flex-wrap: wrap; }
 .nav-btn {
   background: transparent; color: rgba(255,255,255,0.7); border: none;
-  padding: 8px 18px; cursor: pointer; font-size: 14px; border-radius: 4px;
-  transition: all 0.2s;
+  padding: 8px 14px; cursor: pointer; font-size: 13px; border-radius: 4px;
+  transition: all 0.2s; white-space: nowrap;
 }
 .nav-btn:hover { color: white; background: rgba(255,255,255,0.1); }
 .nav-btn.active { color: white; background: rgba(255,255,255,0.2); font-weight: 600; }
