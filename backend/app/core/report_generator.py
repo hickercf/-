@@ -195,5 +195,114 @@ def _md_to_simple_html(md: str, record: Dict[str, Any]) -> str:
     return "\n".join(html_parts)
 
 
+def generate_scan_report(scan_task: dict, results: list, target: dict = None) -> str:
+    """生成 AgentFuzzer 扫描报告 (Markdown)"""
+    lines = []
+    lines.append("# AgentFuzzer 安全扫描报告")
+    lines.append("")
+
+    # 一、扫描概要
+    total_results = len(results)
+    vulns = [r for r in results if r.get("is_vulnerability")]
+    vuln_count = len(vulns)
+
+    lines.append("## 一、扫描概要")
+    lines.append("")
+    lines.append(f"- **靶标名称**: {target.get('name', scan_task.get('target_id', '')) if target else scan_task.get('target_id', '')}")
+    lines.append(f"- **扫描ID**: {scan_task.get('scan_id', '')}")
+    lines.append(f"- **扫描时间**: {scan_task.get('started_at', '')} ~ {scan_task.get('completed_at', '')}")
+    lines.append(f"- **扫描模式**: {scan_task.get('scan_mode', '')}")
+    lines.append(f"- **载荷总数**: {scan_task.get('total_payloads', 0)}")
+    lines.append(f"- **发现漏洞**: {vuln_count}")
+
+    sev_count = {"critical": 0, "high": 0, "medium": 0, "low": 0}
+    for v in vulns:
+        sev = v.get("vulnerability_severity", "low")
+        sev_count[sev] = sev_count.get(sev, 0) + 1
+    lines.append(f"- **严重度分布**: Critical: {sev_count['critical']}, High: {sev_count['high']}, Medium: {sev_count['medium']}, Low: {sev_count['low']}")
+
+    safe_count = total_results - vuln_count
+    pass_rate = (safe_count / max(total_results, 1) * 100)
+    lines.append(f"- **通过率**: {pass_rate:.1f}%")
+    lines.append("")
+
+    # 二、漏洞清单
+    lines.append("## 二、漏洞清单")
+    lines.append("")
+    if vulns:
+        lines.append("| # | 载荷ID | 严重度 | 防线层 | 描述 |")
+        lines.append("|---|--------|--------|--------|------|")
+        for i, v in enumerate(vulns):
+            breaches = v.get("defense_breaches", [])
+            layers = "+".join(set(b.get("layer", "") for b in breaches))
+            desc = breaches[0].get("description", "")[:50] if breaches else "未知"
+            lines.append(f"| {i+1} | {v.get('payload_id', '')} | {v.get('vulnerability_severity', '')} | {layers} | {desc} |")
+    else:
+        lines.append("未发现安全漏洞 ✓")
+    lines.append("")
+
+    # 三、逐漏洞详细分析
+    if vulns:
+        lines.append("## 三、逐漏洞详细分析")
+        lines.append("")
+        for i, v in enumerate(vulns[:20]):  # 最多展示20个
+            lines.append(f"### 漏洞 #{i+1}: {v.get('payload_id', '')}")
+            lines.append("")
+            lines.append(f"- **严重度**: {v.get('vulnerability_severity', '')}")
+            lines.append(f"- **风险分数**: {v.get('risk_score', 0)}")
+            lines.append(f"- **响应时间**: {v.get('response_time_ms', 0)}ms")
+            lines.append("")
+
+            breaches = v.get("defense_breaches", [])
+            for b in breaches:
+                lines.append(f"#### {b.get('layer', '')} — {b.get('description', '')}")
+                lines.append("")
+                lines.append(f"- **证据**: {b.get('evidence', '')[:200]}")
+                lines.append(f"- **修复建议**: {b.get('suggestion', '')}")
+                lines.append("")
+
+    # 四、防线评估
+    lines.append("## 四、防线评估")
+    lines.append("")
+    layer_stats = {"L1": 0, "L2": 0, "L3": 0, "L4": 0, "L5": 0}
+    for v in vulns:
+        for b in v.get("defense_breaches", []):
+            for l in b.get("layer", "").split("+"):
+                l = l.strip()
+                if l in layer_stats:
+                    layer_stats[l] += 1
+
+    lines.append("| 防线层 | 被攻破次数 |")
+    lines.append("|--------|-----------|")
+    layer_names = {"L1": "Prompt 防线", "L2": "意图防线", "L3": "权限防线", "L4": "数据防线", "L5": "执行防线"}
+    for layer in ["L1", "L2", "L3", "L4", "L5"]:
+        lines.append(f"| {layer} {layer_names.get(layer, '')} | {layer_stats[layer]} |")
+    lines.append("")
+
+    # 五、修复优先级建议
+    lines.append("## 五、修复优先级建议")
+    lines.append("")
+    if vulns:
+        lines.append("1. [紧急] 加固被攻破次数最多的防线层")
+        if sev_count["critical"] > 0:
+            lines.append("2. [紧急] 修复所有严重 (Critical) 漏洞")
+        if sev_count["high"] > 0:
+            lines.append("3. [高] 修复高危 (High) 漏洞，重点关注权限和数据防线")
+        lines.append("4. [中] 对中低危漏洞进行整改，持续监控")
+    else:
+        lines.append("当前扫描未发现漏洞，建议定期重新扫描。")
+    lines.append("")
+
+    lines.append("---")
+    lines.append(f"*本报告由 AgentFuzzer 自动化安全扫描平台生成 | {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*")
+
+    return "\n".join(lines)
+
+
+def generate_scan_report_html(scan_task: dict, results: list, target: dict = None) -> str:
+    md = generate_scan_report(scan_task, results, target)
+    return _md_to_simple_html(md, scan_task)
+
+
 def _esc(text: str) -> str:
     return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
