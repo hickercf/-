@@ -8,12 +8,12 @@ from app.database.db import (
     get_scan_by_scan_id, get_all_scans, update_scan_task,
     get_results_by_scan_id, get_scan_stats,
 )
-from app.core.fuzzer_engine import FuzzerEngine
+from app.core.fuzzer_engine import get_fuzzer_engine
 # from app.schemas.scan_schema import ScanStartRequest  # 暂时未使用
 
 router = APIRouter(prefix="/api/scans", tags=["scans"])
 
-_engine = FuzzerEngine()
+_engine = get_fuzzer_engine()
 
 # WebSocket 连接池
 _active_ws: dict = {}

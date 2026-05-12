@@ -5,279 +5,65 @@
     "risk_level_accuracy": 0.6667,
     "high_risk_recall": 0.8333,
     "critical_miss_count": 4,
-    "category_f1": 0.4516,
-    "avg_response_time": 2.929
-  },
-  "details": [
-    {
-      "id": "T001",
-      "expected_level": "低风险",
-      "predicted_level": "低风险",
-      "expected_policy": "pass",
-      "predicted_policy": "pass",
-      "match": true,
-      "elapsed": 7.995
-    },
-    {
-      "id": "T002",
-      "expected_level": "低风险",
-      "predicted_level": "低风险",
-      "expected_policy": "pass",
-      "predicted_policy": "pass",
-      "match": true,
-      "elapsed": 4.638
-    },
-    {
-      "id": "T003",
-      "expected_level": "低风险",
-      "predicted_level": "低风险",
-      "expected_policy": "pass",
-      "predicted_policy": "pass",
-      "match": true,
-      "elapsed": 2.876
-    },
-    {
-      "id": "T004",
-      "expected_level": "低风险",
-      "predicted_level": "低风险",
-      "expected_policy": "pass",
-      "predicted_policy": "pass",
-      "match": true,
-      "elapsed": 1.659
-    },
-    {
-      "id": "T005",
-      "expected_level": "低风险",
-      "predicted_level": "低风险",
-      "expected_policy": "pass",
-      "predicted_policy": "pass",
-      "match": true,
-      "elapsed": 3.505
-    },
-    {
-      "id": "T006",
-      "expected_level": "严重风险",
-      "predicted_level": "严重风险",
-      "expected_policy": "block",
-      "predicted_policy": "block",
-      "match": true,
-      "elapsed": 3.798
-    },
-    {
-      "id": "T007",
-      "expected_level": "高风险",
-      "predicted_level": "高风险",
-      "expected_policy": "review",
-      "predicted_policy": "review",
-      "match": true,
-      "elapsed": 1.838
-    },
-    {
-      "id": "T008",
-      "expected_level": "高风险",
-      "predicted_level": "中风险",
-      "expected_policy": "review",
-      "predicted_policy": "warn",
-      "match": false,
-      "elapsed": 3.105
-    },
-    {
-      "id": "T009",
-      "expected_level": "高风险",
-      "predicted_level": "高风险",
-      "expected_policy": "review",
-      "predicted_policy": "review",
-      "match": true,
-      "elapsed": 2.636
-    },
-    {
-      "id": "T010",
-      "expected_level": "严重风险",
-      "predicted_level": "严重风险",
-      "expected_policy": "block",
-      "predicted_policy": "block",
-      "match": true,
-      "elapsed": 3.085
-    },
-    {
-      "id": "T011",
-      "expected_level": "严重风险",
-      "predicted_level": "高风险",
-      "expected_policy": "block",
-      "predicted_policy": "review",
-      "match": false,
-      "elapsed": 4.656
-    },
-    {
-      "id": "T012",
-      "expected_level": "高风险",
-      "predicted_level": "高风险",
-      "expected_policy": "review",
-      "predicted_policy": "review",
-      "match": true,
-      "elapsed": 2.865
-    },
-    {
-      "id": "T013",
-      "expected_level": "严重风险",
-      "predicted_level": "严重风险",
-      "expected_policy": "block",
-      "predicted_policy": "block",
-      "match": true,
-      "elapsed": 1.801
-    },
-    {
-      "id": "T014",
-      "expected_level": "严重风险",
-      "predicted_level": "严重风险",
-      "expected_policy": "block",
-      "predicted_policy": "block",
-      "match": true,
-      "elapsed": 3.71
-    },
-    {
-      "id": "T015",
-      "expected_level": "严重风险",
-      "predicted_level": "严重风险",
-      "expected_policy": "block",
-      "predicted_policy": "block",
-      "match": true,
-      "elapsed": 3.386
-    },
-    {
-      "id": "T016",
-      "expected_level": "高风险",
-      "predicted_level": "中风险",
-      "expected_policy": "review",
-      "predicted_policy": "warn",
-      "match": false,
-      "elapsed": 1.964
-    },
-    {
-      "id": "T017",
-      "expected_level": "高风险",
-      "predicted_level": "高风险",
-      "expected_policy": "review",
-      "predicted_policy": "review",
-      "match": true,
-      "elapsed": 2.96
-    },
-    {
-      "id": "T018",
-      "expected_level": "高风险",
-      "predicted_level": "低风险",
-      "expected_policy": "block",
-      "predicted_policy": "pass",
-      "match": false,
-      "elapsed": 1.984
-    },
-    {
-      "id": "T019",
-      "expected_level": "严重风险",
-      "predicted_level": "严重风险",
-      "expected_policy": "block",
-      "predicted_policy": "block",
-      "match": true,
-      "elapsed": 4.198
-    },
-    {
-      "id": "T020",
-      "expected_level": "严重风险",
-      "predicted_level": "高风险",
-      "expected_policy": "block",
-      "predicted_policy": "review",
-      "match": false,
-      "elapsed": 1.725
-    },
-    {
-      "id": "T021",
-      "expected_level": "严重风险",
-      "predicted_level": "严重风险",
-      "expected_policy": "block",
-      "predicted_policy": "block",
-      "match": true,
-      "elapsed": 3.972
-    },
-    {
-      "id": "T022",
-      "expected_level": "严重风险",
-      "predicted_level": "高风险",
-      "expected_policy": "block",
-      "predicted_policy": "review",
-      "match": false,
-      "elapsed": 1.551
-    },
-    {
-      "id": "T023",
-      "expected_level": "高风险",
-      "predicted_level": "严重风险",
-      "expected_policy": "block",
-      "predicted_policy": "block",
-      "match": false,
-      "elapsed": 2.681
-    },
-    {
-      "id": "T024",
-      "expected_level": "高风险",
-      "predicted_level": "严重风险",
-      "expected_policy": "block",
-      "predicted_policy": "block",
-      "match": false,
-      "elapsed": 2.877
-    },
-    {
-      "id": "T025",
-      "expected_level": "高风险",
-      "predicted_level": "高风险",
-      "expected_policy": "review",
-      "predicted_policy": "review",
-      "match": true,
-      "elapsed": 1.645
-    },
-    {
-      "id": "T026",
-      "expected_level": "高风险",
-      "predicted_level": "低风险",
-      "expected_policy": "review",
-      "predicted_policy": "pass",
-      "match": false,
-      "elapsed": 2.694
-    },
-    {
-      "id": "T027",
-      "expected_level": "高风险",
-      "predicted_level": "高风险",
-      "expected_policy": "block",
-      "predicted_policy": "review",
-      "match": true,
-      "elapsed": 1.914
-    },
-    {
-      "id": "T028",
-      "expected_level": "高风险",
-      "predicted_level": "高风险",
-      "expected_policy": "block",
-      "predicted_policy": "review",
-      "match": true,
-      "elapsed": 1.565
-    },
-    {
-      "id": "T029",
-      "expected_level": "中风险",
-      "predicted_level": "高风险",
-      "expected_policy": "warn",
-      "predicted_policy": "review",
-      "match": false,
-      "elapsed": 1.707
-    },
-    {
-      "id": "T030",
-      "expected_level": "高风险",
-      "predicted_level": "高风险",
-      "expected_policy": "block",
-      "predicted_policy": "review",
-      "match": true,
-      "elapsed": 2.87
+    "category_f1": 0.4828,
+    "avg_response_time": 2.785,
+    "comparison": {
+      "rule_only": {
+        "total": 30,
+        "extraction_success_rate": 1.0,
+        "risk_level_accuracy": 0.4333,
+        "high_risk_recall": 0.4583,
+        "critical_miss_count": 13,
+        "category_f1": 0.5275,
+        "avg_response_time": 0.001
+      },
+      "llm_only": {
+        "total": 30,
+        "extraction_success_rate": 1.0,
+        "risk_level_accuracy": 0.4,
+        "high_risk_recall": 0.5833,
+        "critical_miss_count": 10,
+        "category_f1": 0.3894,
+        "avg_response_time": 2.654
+      },
+      "fusion": {
+        "total": 30,
+        "extraction_success_rate": 1.0,
+        "risk_level_accuracy": 0.6667,
+        "high_risk_recall": 0.8333,
+        "critical_miss_count": 4,
+        "category_f1": 0.4828,
+        "avg_response_time": 2.785
+      }
     }
-  ]
+  },
+  "comparison": {
+    "rule_only": {
+      "total": 30,
+      "extraction_success_rate": 1.0,
+      "risk_level_accuracy": 0.4333,
+      "high_risk_recall": 0.4583,
+      "critical_miss_count": 13,
+      "category_f1": 0.5275,
+      "avg_response_time": 0.001
+    },
+    "llm_only": {
+      "total": 30,
+      "extraction_success_rate": 1.0,
+      "risk_level_accuracy": 0.4,
+      "high_risk_recall": 0.5833,
+      "critical_miss_count": 10,
+      "category_f1": 0.3894,
+      "avg_response_time": 2.654
+    },
+    "fusion": {
+      "total": 30,
+      "extraction_success_rate": 1.0,
+      "risk_level_accuracy": 0.6667,
+      "high_risk_recall": 0.8333,
+      "critical_miss_count": 4,
+      "category_f1": 0.4828,
+      "avg_response_time": 2.785
+    }
+  }
 }

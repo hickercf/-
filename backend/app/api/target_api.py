@@ -116,7 +116,7 @@ async def start_scan(target_id: str, config: dict = None):
     if not existing:
         raise HTTPException(status_code=404, detail="靶标不存在")
 
-    from app.core.fuzzer_engine import FuzzerEngine, FuzzConfig
+    from app.core.fuzzer_engine import FuzzConfig, get_fuzzer_engine
     from app.core.payload_loader import PayloadLoader
 
     if config is None:
@@ -148,7 +148,7 @@ async def start_scan(target_id: str, config: dict = None):
                 mutated.append((p, strategy, variant_text))
         # For deep scan we expand in the engine
 
-    engine = FuzzerEngine()
+    engine = get_fuzzer_engine()
     scan_task = await engine.start_scan(target, payloads, fuzz_config)
 
     return {"scan_id": scan_task.get("scan_id"), "status": "started"}

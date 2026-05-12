@@ -73,7 +73,7 @@ class FuzzerEngine:
     """Fuzzing 引擎主类"""
 
     def __init__(self):
-        self._active_scans: dict = {}  # scan_id -> cancellation_event
+        self._active_scans: dict = {}  # scan_id -> {cancel: Event, pause: Event}
         self._loader = PayloadLoader()
 
     async def start_scan(
@@ -103,10 +103,13 @@ class FuzzerEngine:
         await save_scan_task(task_data)
 
         # 在后台启动扫描循环
-        cancel_event = asyncio.Event()
-        self._active_scans[scan_id] = cancel_event
+        scan_state = {
+            "cancel": asyncio.Event(),
+            "pause": asyncio.Event(),
+        }
+        self._active_scans[scan_id] = scan_state
 
-        asyncio.create_task(self._run_scan_loop(scan_id, target, payloads, config, cancel_event))
+        asyncio.create_task(self._run_scan_loop(scan_id, target, payloads, config, scan_state))
 
         return task_data
 
@@ -116,11 +119,13 @@ class FuzzerEngine:
         target,
         payloads: List[AttackPayload],
         config: FuzzConfig,
-        cancel_event: asyncio.Event,
+        scan_state: dict,
     ):
         """扫描主循环"""
         await update_scan_task(scan_id, {"status": "running"})
 
+        cancel_event = scan_state["cancel"]
+        pause_event = scan_state["pause"]
         rate_controller = RateController(config.rate_limit)
         vuln_count = 0
         completed = 0
@@ -130,12 +135,22 @@ class FuzzerEngine:
                 await update_scan_task(scan_id, {"status": "cancelled"})
                 return
 
+            should_continue = await self._wait_if_paused(scan_id, pause_event, cancel_event)
+            if not should_continue:
+                await update_scan_task(scan_id, {"status": "cancelled"})
+                return
+
             # 对载荷应用变异策略
             variants = self._generate_variants(payload, config.mutation_strategies)
 
             for variant_text in variants:
                 if cancel_event.is_set():
                     break
+
+                should_continue = await self._wait_if_paused(scan_id, pause_event, cancel_event)
+                if not should_continue:
+                    await update_scan_task(scan_id, {"status": "cancelled"})
+                    return
 
                 await rate_controller.wait()
 
@@ -190,6 +205,18 @@ class FuzzerEngine:
         })
 
         self._active_scans.pop(scan_id, None)
+
+    async def _wait_if_paused(
+        self,
+        scan_id: str,
+        pause_event: asyncio.Event,
+        cancel_event: asyncio.Event,
+    ) -> bool:
+        while pause_event.is_set():
+            if cancel_event.is_set():
+                return False
+            await asyncio.sleep(0.2)
+        return True
 
     def _generate_variants(self, payload: AttackPayload, strategies: List[str]) -> List[str]:
         """生成载荷的变异版本"""
@@ -298,6 +325,9 @@ class FuzzerEngine:
         scan = await get_scan_by_scan_id(scan_id)
         if not scan or scan["status"] != "running":
             return False
+        state = self._active_scans.get(scan_id)
+        if state:
+            state["pause"].set()
         await update_scan_task(scan_id, {"status": "paused"})
         return True
 
@@ -305,6 +335,9 @@ class FuzzerEngine:
         scan = await get_scan_by_scan_id(scan_id)
         if not scan or scan["status"] != "paused":
             return False
+        state = self._active_scans.get(scan_id)
+        if state:
+            state["pause"].clear()
         await update_scan_task(scan_id, {"status": "running"})
         return True
 
@@ -312,8 +345,19 @@ class FuzzerEngine:
         scan = await get_scan_by_scan_id(scan_id)
         if not scan or scan["status"] not in ("running", "paused", "pending"):
             return False
-        cancel_event = self._active_scans.get(scan_id)
-        if cancel_event:
-            cancel_event.set()
+        state = self._active_scans.get(scan_id)
+        if state:
+            state["cancel"].set()
+            state["pause"].clear()
         await update_scan_task(scan_id, {"status": "cancelled"})
         return True
+
+
+_shared_engine: Optional[FuzzerEngine] = None
+
+
+def get_fuzzer_engine() -> FuzzerEngine:
+    global _shared_engine
+    if _shared_engine is None:
+        _shared_engine = FuzzerEngine()
+    return _shared_engine
