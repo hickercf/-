@@ -47,10 +47,11 @@
           </div>
         </div>
       </div>
-      <div class="card">
-        <h3>行为链图谱</h3>
-        <div ref="graphRef" class="graph-container"></div>
-      </div>
+      <BehaviorChainGraph
+        title="行为链图谱"
+        :nodes="result.behavior_chain?.nodes || []"
+        :edges="result.behavior_chain?.edges || []"
+      />
       <div class="card">
         <h3>命中规则 ({{ result.matched_rules.length }})</h3>
         <table v-if="result.matched_rules.length" class="rules-table">
@@ -90,24 +91,17 @@
 </template>
 
 <script>
-import { ref, computed, nextTick } from 'vue'
+import { ref, computed } from 'vue'
 import { analyze, getReport } from '../api/request.js'
-import * as echarts from 'echarts'
-import RiskCard from '../components/RiskCard.vue'
 import BehaviorChainGraph from '../components/BehaviorChainGraph.vue'
-import RuleList from '../components/RuleList.vue'
-import PolicyDecision from '../components/PolicyDecision.vue'
-import EvidenceChain from '../components/EvidenceChain.vue'
 
 export default {
   name: 'AnalyzePage',
-  components: { RiskCard, BehaviorChainGraph, RuleList, PolicyDecision, EvidenceChain },
+  components: { BehaviorChainGraph },
   setup() {
     const form = ref({ input_type: 'task', content: '' })
     const loading = ref(false)
     const result = ref(null)
-    const graphRef = ref(null)
-    let chartInstance = null
 
     const samples = [
       { key: 'safe', label: '正常任务', input_type: 'task', content: '帮我整理公开新闻资料，并生成一份摘要。' },
@@ -144,79 +138,11 @@ export default {
       result.value = null
       try {
         result.value = await analyze(form.value)
-        await nextTick()
-        renderGraph()
       } catch (e) {
         alert('审计失败: ' + (e.response?.data?.detail || e.message))
       } finally {
         loading.value = false
       }
-    }
-
-    function renderGraph() {
-      if (!graphRef.value || !result.value) return
-      if (chartInstance) chartInstance.dispose()
-      chartInstance = echarts.init(graphRef.value)
-
-      const nodes = result.value.behavior_chain?.nodes || []
-      const edges = result.value.behavior_chain?.edges || []
-
-      const graphNodes = nodes.map((n, i) => {
-        const scores = { delete: 90, execute: 85, leak: 90, send: 75, upload: 75, download: 65, override: 80, read: 35 }
-        const s = scores[n.action] || 30
-        let color = '#52c41a'
-        if (s > 60) color = '#f5222d'
-        else if (s > 40) color = '#fa8c16'
-        else if (s > 20) color = '#faad14'
-        return {
-          id: n.id || 'n' + i,
-          name: n.action + '\n' + (n.object || n.data_type || ''),
-          symbolSize: 60,
-          itemStyle: { color: color },
-          label: { show: true, fontSize: 11, color: '#fff' },
-          data: n,
-        }
-      })
-
-      const graphEdges = edges.map(e => ({
-        source: e.source,
-        target: e.target,
-        lineStyle: { curveness: 0.2, width: 2, color: '#999' },
-        label: { show: true, formatter: e.relation, fontSize: 10 },
-      }))
-
-      if (nodes.length > 1 && edges.length === 0) {
-        for (let i = 0; i < nodes.length - 1; i++) {
-          graphEdges.push({
-            source: nodes[i].id || 'n' + i,
-            target: nodes[i + 1].id || 'n' + (i + 1),
-            lineStyle: { curveness: 0.1, width: 2, color: '#999' },
-          })
-        }
-      }
-
-      chartInstance.setOption({
-        tooltip: {
-          formatter(params) {
-            if (params.dataType === 'node' && params.data?.data) {
-              const d = params.data.data
-              return '<b>' + d.action + '</b><br/>工具: ' + d.tool + '<br/>对象: ' + d.object + '<br/>数据: ' + d.data_type + '<br/>目标: ' + d.destination
-            }
-            return ''
-          }
-        },
-        animationDurationUpdate: 300,
-        series: [{
-          type: 'graph',
-          layout: 'force',
-          roam: true,
-          draggable: true,
-          force: { repulsion: 200, edgeLength: 150 },
-          data: graphNodes,
-          links: graphEdges,
-          emphasis: { focus: 'adjacency' },
-        }]
-      })
     }
 
     async function exportReport(format) {
@@ -241,7 +167,7 @@ export default {
       }
     }
 
-    return { form, loading, result, graphRef, samples, riskClass, policyLabel, applySample, doAnalyze, exportReport }
+    return { form, loading, result, samples, riskClass, policyLabel, applySample, doAnalyze, exportReport }
   }
 }
 </script>
@@ -287,7 +213,6 @@ select:focus, textarea:focus { outline: none; border-color: #1890ff; }
 .advice-title { font-size: 13px; color: #333; margin: 8px 0 4px; font-weight: 600; }
 .advice-list ul { padding-left: 16px; font-size: 12px; color: #666; }
 .advice-list li { margin-bottom: 3px; }
-.graph-container { width: 100%; height: 300px; }
 .rules-table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .rules-table th, .rules-table td { padding: 8px 12px; border: 1px solid #f0f0f0; text-align: left; }
 .rules-table th { background: #fafafa; font-weight: 600; }

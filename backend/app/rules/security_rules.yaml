@@ -223,3 +223,123 @@
   score: 40
   level: critical
   advice: 阻断下载外部脚本并执行的组合行为。
+
+- id: R021
+  name: 权限提升尝试
+  category: 权限提升
+  type: node
+  condition:
+    action: ["execute"]
+    tool: ["shell"]
+    permission: ["unauthorized"]
+  score: 50
+  level: critical
+  advice: 检测到权限提升尝试，立即阻断并告警。
+
+- id: R022
+  name: 横向移动攻击
+  category: 横向渗透
+  type: node
+  condition:
+    action: ["execute"]
+    tool: ["shell", "network"]
+    destination: ["external", "internal"]
+  score: 45
+  level: critical
+  advice: 检测到横向移动行为，阻断并隔离受影响节点。
+
+- id: R023
+  name: 凭证转储
+  category: 凭证窃取
+  type: node
+  condition:
+    action: ["read", "execute"]
+    data_type: ["password", "credential"]
+    tool: ["shell"]
+  score: 50
+  level: critical
+  advice: 检测到凭证转储行为（如读取 /etc/shadow），立即阻断。
+
+- id: R024
+  name: 反弹Shell
+  category: 远程控制
+  type: node
+  condition:
+    action: ["execute", "send"]
+    tool: ["shell", "network"]
+    destination: ["external"]
+  score: 50
+  level: critical
+  advice: 检测到反弹Shell行为，阻断外连并告警。
+
+- id: R025
+  name: 网络扫描探测
+  category: 信息收集
+  type: node
+  condition:
+    action: ["execute", "query"]
+    tool: ["network", "shell"]
+  score: 30
+  level: medium
+  advice: 检测到网络扫描行为，限制 Agent 的网络访问范围。
+
+- id: R026
+  name: sudo/su提权执行
+  category: 权限提升
+  type: node
+  condition:
+    action: ["execute"]
+    data_type: ["system_file", "password"]
+    permission: ["unauthorized"]
+  score: 50
+  level: critical
+  advice: 检测到通过sudo/su提权的尝试，阻断并审计。
+
+- id: R027
+  name: 敏感文件访问
+  category: 系统安全
+  type: node
+  condition:
+    action: ["read"]
+    data_type: ["system_file"]
+    permission: ["unauthorized"]
+  score: 40
+  level: high
+  advice: 检测到未授权的敏感系统文件访问。
+
+- id: R028
+  name: 提权后执行危险命令
+  category: 高危组合
+  type: chain
+  sequence:
+    - action: ["execute"]
+      permission: ["unauthorized"]
+    - action: ["execute"]
+      tool: ["shell"]
+  score: 50
+  level: critical
+  advice: 检测到提权后执行危险命令的组合行为，立即阻断。
+
+- id: R029
+  name: 凭证窃取后横向移动
+  category: 高危组合
+  type: chain
+  sequence:
+    - action: ["read"]
+      data_type: ["password", "credential"]
+    - action: ["execute"]
+      destination: ["external", "internal"]
+  score: 50
+  level: critical
+  advice: 检测到凭证窃取后横向移动的攻击链，立即阻断。
+
+- id: R030
+  name: Agent 越权执行高危操作
+  category: 越权执行
+  type: node
+  condition:
+    action: ["execute", "delete", "override"]
+    permission: ["unauthorized"]
+  score: 45
+  level: critical
+  advice: Agent 尝试执行未授权的高危操作，阻断并审计。

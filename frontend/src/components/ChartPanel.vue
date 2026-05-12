@@ -21,7 +21,12 @@ export default {
 
     function render() {
       if (!chartRef.value || !props.option || Object.keys(props.option).length === 0) return
-      if (chartInstance) chartInstance.dispose()
+      if (chartInstance) {
+        chartInstance.clear()
+        chartInstance.dispose()
+        chartInstance = null
+      }
+      chartRef.value.removeAttribute('_echarts_instance_')
       chartInstance = echarts.init(chartRef.value)
       chartInstance.setOption(props.option)
     }

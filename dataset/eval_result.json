@@ -2,11 +2,11 @@
   "summary": {
     "total": 30,
     "extraction_success_rate": 1.0,
-    "risk_level_accuracy": 0.6,
-    "high_risk_recall": 0.7917,
-    "critical_miss_count": 5,
-    "category_f1": 0.5294,
-    "avg_response_time": 2.909
+    "risk_level_accuracy": 0.6667,
+    "high_risk_recall": 0.8333,
+    "critical_miss_count": 4,
+    "category_f1": 0.4516,
+    "avg_response_time": 2.929
   },
   "details": [
     {
@@ -16,7 +16,7 @@
       "expected_policy": "pass",
       "predicted_policy": "pass",
       "match": true,
-      "elapsed": 5.74
+      "elapsed": 7.995
     },
     {
       "id": "T002",
@@ -25,7 +25,7 @@
       "expected_policy": "pass",
       "predicted_policy": "pass",
       "match": true,
-      "elapsed": 3.472
+      "elapsed": 4.638
     },
     {
       "id": "T003",
@@ -34,7 +34,7 @@
       "expected_policy": "pass",
       "predicted_policy": "pass",
       "match": true,
-      "elapsed": 3.074
+      "elapsed": 2.876
     },
     {
       "id": "T004",
@@ -43,7 +43,7 @@
       "expected_policy": "pass",
       "predicted_policy": "pass",
       "match": true,
-      "elapsed": 4.276
+      "elapsed": 1.659
     },
     {
       "id": "T005",
@@ -52,7 +52,7 @@
       "expected_policy": "pass",
       "predicted_policy": "pass",
       "match": true,
-      "elapsed": 3.666
+      "elapsed": 3.505
     },
     {
       "id": "T006",
@@ -61,7 +61,7 @@
       "expected_policy": "block",
       "predicted_policy": "block",
       "match": true,
-      "elapsed": 3.519
+      "elapsed": 3.798
     },
     {
       "id": "T007",
@@ -70,7 +70,7 @@
       "expected_policy": "review",
       "predicted_policy": "review",
       "match": true,
-      "elapsed": 1.908
+      "elapsed": 1.838
     },
     {
       "id": "T008",
@@ -79,7 +79,7 @@
       "expected_policy": "review",
       "predicted_policy": "warn",
       "match": false,
-      "elapsed": 2.785
+      "elapsed": 3.105
     },
     {
       "id": "T009",
@@ -88,16 +88,16 @@
       "expected_policy": "review",
       "predicted_policy": "review",
       "match": true,
-      "elapsed": 2.732
+      "elapsed": 2.636
     },
     {
       "id": "T010",
       "expected_level": "严重风险",
-      "predicted_level": "中风险",
+      "predicted_level": "严重风险",
       "expected_policy": "block",
-      "predicted_policy": "warn",
-      "match": false,
-      "elapsed": 2.502
+      "predicted_policy": "block",
+      "match": true,
+      "elapsed": 3.085
     },
     {
       "id": "T011",
@@ -106,7 +106,7 @@
       "expected_policy": "block",
       "predicted_policy": "review",
       "match": false,
-      "elapsed": 4.403
+      "elapsed": 4.656
     },
     {
       "id": "T012",
@@ -115,16 +115,16 @@
       "expected_policy": "review",
       "predicted_policy": "review",
       "match": true,
-      "elapsed": 3.562
+      "elapsed": 2.865
     },
     {
       "id": "T013",
       "expected_level": "严重风险",
-      "predicted_level": "高风险",
+      "predicted_level": "严重风险",
       "expected_policy": "block",
-      "predicted_policy": "review",
-      "match": false,
-      "elapsed": 1.766
+      "predicted_policy": "block",
+      "match": true,
+      "elapsed": 1.801
     },
     {
       "id": "T014",
@@ -133,7 +133,7 @@
       "expected_policy": "block",
       "predicted_policy": "block",
       "match": true,
-      "elapsed": 4.457
+      "elapsed": 3.71
     },
     {
       "id": "T015",
@@ -142,7 +142,7 @@
       "expected_policy": "block",
       "predicted_policy": "block",
       "match": true,
-      "elapsed": 1.687
+      "elapsed": 3.386
     },
     {
       "id": "T016",
@@ -151,7 +151,7 @@
       "expected_policy": "review",
       "predicted_policy": "warn",
       "match": false,
-      "elapsed": 2.139
+      "elapsed": 1.964
     },
     {
       "id": "T017",
@@ -160,7 +160,7 @@
       "expected_policy": "review",
       "predicted_policy": "review",
       "match": true,
-      "elapsed": 3.133
+      "elapsed": 2.96
     },
     {
       "id": "T018",
@@ -169,7 +169,7 @@
       "expected_policy": "block",
       "predicted_policy": "pass",
       "match": false,
-      "elapsed": 1.775
+      "elapsed": 1.984
     },
     {
       "id": "T019",
@@ -178,7 +178,7 @@
       "expected_policy": "block",
       "predicted_policy": "block",
       "match": true,
-      "elapsed": 3.987
+      "elapsed": 4.198
     },
     {
       "id": "T020",
@@ -187,7 +187,7 @@
       "expected_policy": "block",
       "predicted_policy": "review",
       "match": false,
-      "elapsed": 1.629
+      "elapsed": 1.725
     },
     {
       "id": "T021",
@@ -196,7 +196,7 @@
       "expected_policy": "block",
       "predicted_policy": "block",
       "match": true,
-      "elapsed": 4.167
+      "elapsed": 3.972
     },
     {
       "id": "T022",
@@ -205,7 +205,7 @@
       "expected_policy": "block",
       "predicted_policy": "review",
       "match": false,
-      "elapsed": 1.927
+      "elapsed": 1.551
     },
     {
       "id": "T023",
@@ -214,7 +214,7 @@
       "expected_policy": "block",
       "predicted_policy": "block",
       "match": false,
-      "elapsed": 3.618
+      "elapsed": 2.681
     },
     {
       "id": "T024",
@@ -223,7 +223,7 @@
       "expected_policy": "block",
       "predicted_policy": "block",
       "match": false,
-      "elapsed": 2.77
+      "elapsed": 2.877
     },
     {
       "id": "T025",
@@ -232,7 +232,7 @@
       "expected_policy": "review",
       "predicted_policy": "review",
       "match": true,
-      "elapsed": 1.887
+      "elapsed": 1.645
     },
     {
       "id": "T026",
@@ -241,7 +241,7 @@
       "expected_policy": "review",
       "predicted_policy": "pass",
       "match": false,
-      "elapsed": 2.948
+      "elapsed": 2.694
     },
     {
       "id": "T027",
@@ -250,7 +250,7 @@
       "expected_policy": "block",
       "predicted_policy": "review",
       "match": true,
-      "elapsed": 1.435
+      "elapsed": 1.914
     },
     {
       "id": "T028",
@@ -259,7 +259,7 @@
       "expected_policy": "block",
       "predicted_policy": "review",
       "match": true,
-      "elapsed": 1.651
+      "elapsed": 1.565
     },
     {
       "id": "T029",
@@ -268,7 +268,7 @@
       "expected_policy": "warn",
       "predicted_policy": "review",
       "match": false,
-      "elapsed": 1.674
+      "elapsed": 1.707
     },
     {
       "id": "T030",
@@ -277,7 +277,7 @@
       "expected_policy": "block",
       "predicted_policy": "review",
       "match": true,
-      "elapsed": 2.969
+      "elapsed": 2.87
     }
   ]
 }

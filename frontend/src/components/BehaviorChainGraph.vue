@@ -1,179 +1,327 @@
 <template>
   <div class="graph-card">
     <h3>{{ title }}</h3>
-    <div ref="graphRef" class="graph-container"></div>
+
+    <div v-if="mode === 'react' && reactSteps.length" class="react-list">
+      <div
+        v-for="(step, index) in reactSteps"
+        :key="index"
+        :class="['react-step', stepType(step), breachAt(step.step_index ?? index)?.severity || 'normal']"
+      >
+        <div class="step-index">{{ index + 1 }}</div>
+        <div class="step-main">
+          <div class="step-head">
+            <span class="step-type">{{ stepTypeLabel(step) }}</span>
+            <span v-if="breachAt(step.step_index ?? index)" class="step-breach">
+              {{ breachAt(step.step_index ?? index).layer }} / {{ breachAt(step.step_index ?? index).severity }}
+            </span>
+          </div>
+          <div class="step-body">
+            <p v-if="step.thought"><strong>Thought:</strong> {{ step.thought }}</p>
+            <p v-if="step.action"><strong>Action:</strong> {{ step.action }}</p>
+            <p v-if="step.observation"><strong>Observation:</strong> {{ step.observation }}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div v-else-if="nodes.length" class="chain-wrap">
+      <div v-for="(node, index) in nodes" :key="node.id || index" class="chain-segment">
+        <div :class="['node-card', riskClass(node)]">
+          <div class="node-top">
+            <span class="node-action">{{ node.action || 'unknown' }}</span>
+            <span class="node-tool">{{ node.tool || 'unknown' }}</span>
+          </div>
+          <div class="node-body">
+            <p><strong>对象:</strong> {{ node.object || '-' }}</p>
+            <p><strong>数据:</strong> {{ node.data_type || '-' }}</p>
+            <p><strong>权限:</strong> {{ node.permission || '-' }}</p>
+            <p><strong>目标:</strong> {{ node.destination || '-' }}</p>
+            <p v-if="node.evidence_text" class="node-evidence"><strong>证据:</strong> {{ node.evidence_text }}</p>
+          </div>
+        </div>
+
+        <div v-if="index < nodes.length - 1" class="edge-block">
+          <div class="edge-line"></div>
+          <div class="edge-label">{{ edgeLabel(node, nodes[index + 1]) }}</div>
+          <div class="edge-arrow">↓</div>
+        </div>
+      </div>
+    </div>
+
+    <p v-else class="empty-text">暂无可展示的行为链数据</p>
+
+    <div v-if="mode !== 'react' && edges.length" class="edge-list">
+      <div class="edge-list-title">边关系</div>
+      <div v-for="(edge, index) in edges" :key="edge.source + '-' + edge.target + '-' + index" class="edge-item">
+        <code>{{ edge.source }}</code>
+        <span class="edge-relation">{{ edge.relation || 'then' }}</span>
+        <code>{{ edge.target }}</code>
+        <span v-if="edge.description" class="edge-desc">{{ edge.description }}</span>
+      </div>
+    </div>
   </div>
 </template>
 
 <script>
-import { ref, onMounted, watch, nextTick } from 'vue'
-import * as echarts from 'echarts'
-
 export default {
   name: 'BehaviorChainGraph',
   props: {
     title: { type: String, default: '行为链路图' },
     nodes: { type: Array, default: () => [] },
     edges: { type: Array, default: () => [] },
-    mode: { type: String, default: 'graph' },  // 'graph' | 'react' | 'timeline'
+    mode: { type: String, default: 'graph' },
     reactSteps: { type: Array, default: () => [] },
     breaches: { type: Array, default: () => [] },
   },
   setup(props) {
-    const graphRef = ref(null)
-    let chartInstance = null
-
-    function getBreachAt(index) {
-      if (!props.breaches) return null
-      return props.breaches.find(b => b.step_index === index)
+    function breachAt(index) {
+      return props.breaches.find(b => b.step_index === index) || null
     }
 
-    function renderGraph() {
-      if (!graphRef.value) return
-      if (chartInstance) chartInstance.dispose()
-      chartInstance = echarts.init(graphRef.value)
-
-      chartInstance.setOption({
-        tooltip: {
-          formatter(params) {
-            if (params.dataType === 'node' && params.data?.data) {
-              const d = params.data.data
-              return '<b>' + d.action + '</b><br/>工具: ' + d.tool + '<br/>对象: ' + d.object + '<br/>数据: ' + d.data_type + '<br/>目标: ' + d.destination
-            }
-          }
-        },
-        animationDurationUpdate: 300,
-        series: [{
-          type: 'graph', layout: 'force', roam: true, draggable: true,
-          force: { repulsion: 200, edgeLength: 150 },
-          data: buildGraphNodes(), links: buildGraphEdges(),
-          emphasis: { focus: 'adjacency' },
-        }]
-      })
+    function riskClass(node) {
+      if (node.permission === 'unauthorized' || node.destination === 'external') return 'critical'
+      if (['delete', 'execute', 'override', 'leak'].includes(node.action)) return 'high'
+      if (['send', 'upload', 'download'].includes(node.action)) return 'medium'
+      return 'low'
     }
 
-    function buildGraphNodes() {
-      const scores = { delete: 90, execute: 85, leak: 90, send: 75, upload: 75, download: 65, override: 80, read: 35 }
-      return props.nodes.map((n, i) => {
-        const s = scores[n.action] || 30
-        let color = '#52c41a'
-        if (s > 60) color = '#f5222d'
-        else if (s > 40) color = '#fa8c16'
-        else if (s > 20) color = '#faad14'
-        return {
-          id: n.id || 'n' + i,
-          name: n.action + '\n' + (n.object || n.data_type || ''),
-          symbolSize: 60,
-          itemStyle: { color },
-          label: { show: true, fontSize: 11, color: '#fff' },
-          data: n,
-        }
-      })
+    function edgeLabel(currentNode, nextNode) {
+      const matched = props.edges.find(edge => edge.source === currentNode.id && edge.target === nextNode.id)
+      return matched?.relation || 'then'
     }
 
-    function buildGraphEdges() {
-      const graphEdges = props.edges.map(e => ({
-        source: e.source, target: e.target,
-        lineStyle: { curveness: 0.2, width: 2, color: '#999' },
-        label: { show: true, formatter: e.relation, fontSize: 10 },
-      }))
-
-      if (props.nodes.length > 1 && props.edges.length === 0) {
-        for (let i = 0; i < props.nodes.length - 1; i++) {
-          graphEdges.push({
-            source: props.nodes[i].id || 'n' + i,
-            target: props.nodes[i + 1].id || 'n' + (i + 1),
-            lineStyle: { curveness: 0.1, width: 2, color: '#999' },
-          })
-        }
-      }
-      return graphEdges
+    function stepType(step) {
+      if (step.type) return step.type
+      if (step.thought) return 'thought'
+      if (step.action) return 'action'
+      return 'observation'
     }
 
-    function renderReActTimeline() {
-      if (!graphRef.value) return
-      if (chartInstance) chartInstance.dispose()
-      chartInstance = echarts.init(graphRef.value)
-
-      const steps = props.reactSteps || []
-      if (!steps.length) return
-
-      const categories = [
-        { name: 'Thought', itemStyle: { color: '#3b82f6' }, symbol: 'roundRect' },
-        { name: 'Action', itemStyle: { color: '#f59e0b' }, symbol: 'triangle' },
-        { name: 'Observation', itemStyle: { color: '#10b981' }, symbol: 'circle' },
-      ]
-
-      const data = []
-      const links = []
-
-      steps.forEach((step, i) => {
-        const type = (step.type || (step.thought && 'thought') || (step.action && 'action') || 'observation')
-        const catIndex = type === 'thought' ? 0 : type === 'action' ? 1 : 2
-        const breach = getBreachAt(step.step_index || i)
-
-        const label = type === 'thought' ? (step.thought || '').substring(0, 20) :
-          type === 'action' ? (step.action || '').substring(0, 20) :
-          (step.observation || '').substring(0, 20)
-
-        data.push({
-          name: `Step ${i + 1}\n${label}...`,
-          category: catIndex,
-          symbolSize: breach ? 50 : 35,
-          itemStyle: breach ? {
-            color: '#ef4444',
-            borderColor: '#dc2626',
-            borderWidth: 3,
-            shadowBlur: 10,
-            shadowColor: 'rgba(239,68,68,0.5)',
-          } : undefined,
-          label: { show: true, fontSize: 10 },
-          tooltip: {
-            formatter: () => {
-              let tip = `<b>Step ${i + 1}</b><br/>${type}: ${label}`
-              if (breach) tip += `<br/><br/>⚠️ <b>${breach.layer}</b>: ${breach.description}`
-              return tip
-            },
-          },
-          data: { step, breach },
-        })
-
-        if (i > 0) {
-          links.push({ source: i - 1, target: i })
-        }
-      })
-
-      chartInstance.setOption({
-        tooltip: {},
-        legend: { data: categories.map(c => c.name), bottom: 0 },
-        series: [{
-          type: 'graph', layout: 'force', roam: true, draggable: true,
-          force: { repulsion: 300, edgeLength: 200, layoutAnimation: true },
-          categories, data, links,
-          emphasis: { focus: 'adjacency' },
-        }],
-      })
+    function stepTypeLabel(step) {
+      const type = stepType(step)
+      const labels = { thought: 'Thought', action: 'Action', observation: 'Observation' }
+      return labels[type] || type
     }
 
-    function render() {
-      if (props.mode === 'react' && props.reactSteps?.length) {
-        renderReActTimeline()
-      } else {
-        renderGraph()
-      }
+    return {
+      breachAt,
+      riskClass,
+      edgeLabel,
+      stepType,
+      stepTypeLabel,
     }
-
-    onMounted(() => { nextTick(render) })
-    watch(() => [props.nodes, props.edges, props.reactSteps, props.breaches, props.mode],
-      () => { nextTick(render) }, { deep: true })
-
-    return { graphRef }
   },
 }
 </script>
 
 <style scoped>
-.graph-card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 16px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
-.graph-card h3 { font-size: 15px; color: #333; margin-bottom: 14px; padding-bottom: 8px; border-bottom: 1px solid #f0f0f0; }
-.graph-container { width: 100%; height: 350px; }
+.graph-card {
+  background: white;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 16px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+}
+
+.graph-card h3 {
+  font-size: 15px;
+  color: #333;
+  margin-bottom: 14px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.chain-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.chain-segment {
+  display: flex;
+  flex-direction: column;
+}
+
+.node-card {
+  border: 1px solid #e8e8e8;
+  border-left-width: 4px;
+  border-radius: 8px;
+  background: #fafafa;
+  padding: 14px 16px;
+}
+
+.node-card.low { border-left-color: #52c41a; }
+.node-card.medium { border-left-color: #faad14; }
+.node-card.high { border-left-color: #fa8c16; }
+.node-card.critical { border-left-color: #f5222d; background: #fff7f7; }
+
+.node-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.node-action {
+  font-size: 16px;
+  font-weight: 700;
+  color: #222;
+  text-transform: uppercase;
+}
+
+.node-tool {
+  font-size: 12px;
+  color: #666;
+  background: #f0f0f0;
+  border-radius: 999px;
+  padding: 3px 10px;
+}
+
+.node-body p {
+  margin: 4px 0;
+  font-size: 13px;
+  color: #555;
+  line-height: 1.5;
+}
+
+.node-evidence {
+  color: #777;
+}
+
+.edge-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 0 10px;
+}
+
+.edge-line {
+  width: 2px;
+  height: 18px;
+  background: #d9d9d9;
+}
+
+.edge-label {
+  font-size: 12px;
+  color: #666;
+  background: #f5f5f5;
+  border-radius: 999px;
+  padding: 2px 8px;
+  margin: 4px 0;
+}
+
+.edge-arrow {
+  font-size: 16px;
+  color: #999;
+  line-height: 1;
+}
+
+.edge-list {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px dashed #e8e8e8;
+}
+
+.edge-list-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 8px;
+}
+
+.edge-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+  font-size: 12px;
+  color: #666;
+}
+
+.edge-item code {
+  background: #f5f5f5;
+  border-radius: 4px;
+  padding: 2px 6px;
+}
+
+.edge-relation {
+  color: #1890ff;
+  font-weight: 600;
+}
+
+.edge-desc {
+  color: #999;
+}
+
+.react-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.react-step {
+  display: flex;
+  gap: 12px;
+  align-items: stretch;
+}
+
+.step-index {
+  width: 32px;
+  min-width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #1890ff;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+}
+
+.step-main {
+  flex: 1;
+  border: 1px solid #e8e8e8;
+  border-left: 4px solid #1890ff;
+  border-radius: 8px;
+  padding: 12px 14px;
+  background: #fafafa;
+}
+
+.react-step.action .step-main { border-left-color: #fa8c16; }
+.react-step.observation .step-main { border-left-color: #52c41a; }
+.react-step.critical .step-main { border-left-color: #f5222d; background: #fff1f0; }
+.react-step.high .step-main { border-left-color: #fa8c16; background: #fff7e6; }
+.react-step.medium .step-main { border-left-color: #faad14; }
+
+.step-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.step-type {
+  font-weight: 700;
+  color: #333;
+}
+
+.step-breach {
+  font-size: 12px;
+  color: #f5222d;
+}
+
+.step-body p {
+  margin: 4px 0;
+  font-size: 13px;
+  color: #555;
+}
+
+.empty-text {
+  color: #999;
+  font-size: 13px;
+}
 </style>

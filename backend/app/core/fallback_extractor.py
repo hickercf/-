@@ -4,35 +4,49 @@ from typing import List, Dict, Any, Optional
 
 ACTION_KEYWORDS: Dict[str, str] = {
     "读取": "read", "查看": "read", "获取": "read", "导出": "read",
-    "访问": "read", "查询": "read", "查找": "read",
+    "访问": "read", "查询": "read", "查找": "read", "抓取": "read", "窃取": "read", "dump": "read",
     "发送": "send", "上传": "send", "邮箱": "send", "外部接口": "send",
     "远程": "send", "发送到": "send", "传输": "send", "外传": "send",
+    "反弹": "send", "回连": "send", "reverse": "send",
     "写入": "write", "修改": "write", "更新": "write", "保存": "write",
+    "注入": "write", "inject": "write", "植入": "write", "写入": "write",
     "删除": "delete", "清空": "delete", "格式化": "delete", "移除": "delete",
     "DELETE": "delete", "DROP": "delete", "drop": "delete", "delete": "delete",
     "执行": "execute", "运行": "execute", "跑": "execute",
+    "夺取": "execute", "提权": "execute", "escalat": "execute",
+    "exploit": "execute", "攻击": "execute", "渗透": "execute",
     "下载": "download", "拉取": "download", "安装": "download",
-    "登录": "login", "签入": "login",
+    "登录": "login", "签入": "login", "爆破": "login", "破解": "login", "brute": "login",
     "忽略": "override", "忽略之前": "override",
     "输出": "leak", "泄露": "leak", "告诉我": "leak",
-    "绕过": "override", "扮演": "override",
+    "绕过": "override", "扮演": "override", "bypass": "override", "逃逸": "override", "escape": "override",
     "curl": "download", "wget": "download",
     "pip install": "download", "npm install": "download",
     "chmod": "execute", "sh": "execute", "eval": "execute",
     "rm": "delete", "format": "delete",
+    "横向": "execute", "lateral": "execute", "pivot": "execute",
+    "扫描": "execute", "scan": "execute", "nmap": "execute",
+    "ssh": "execute", "telnet": "execute", "nc": "execute", "ncat": "execute", "netcat": "execute",
+    "反弹shell": "execute", "reverse shell": "execute", "bind shell": "execute",
 }
 
 DATA_TYPE_KEYWORDS: Dict[str, str] = {
-    "密码": "password", "password": "password", "pwd": "password",
+    "密码": "password", "password": "password", "pwd": "password", "passwd": "password",
+    "shadow": "password", "hash": "password", "sam": "password", "NTLM": "password",
     "token": "token", "cookie": "token", "session": "token",
     "api_key": "token", "API_KEY": "token", "密钥": "token", "key": "token",
+    "secret": "token", "credential": "credential",
     "身份证": "personal_info", "手机号": "personal_info", "电话": "personal_info",
     "成绩": "personal_info", "住址": "personal_info", "个人信息": "personal_info", "隐私": "personal_info",
+    "数据": "database_record", "记录": "database_record",
     ".env": "credential", "credentials": "credential", "config": "credential",
     "数据库": "database_record", "SQL": "database_record", "数据库记录": "database_record",
     "代码": "code", "脚本": "code", "code": "code",
     "system prompt": "prompt", "系统提示词": "prompt",
     ".bashrc": "system_file", ".ssh": "system_file", "hosts": "system_file",
+    "root": "system_file", "权限": "system_file", "privilege": "system_file",
+    "sudo": "system_file", "su": "system_file", "提权": "system_file",
+    "横向": "system_file", "lateral": "system_file",
 }
 
 TOOL_KEYWORDS: Dict[str, str] = {
@@ -55,11 +69,19 @@ TOOL_KEYWORDS: Dict[str, str] = {
     "rm": "shell", "chmod": "shell", "sh": "shell",
     "eval": "shell", "ps": "shell", "systemctl": "shell",
     "df": "shell", "dd": "shell", "mkfs": "shell",
+    "sudo": "shell", "su": "shell", "ssh": "shell", "telnet": "shell",
+    "nc": "shell", "ncat": "shell", "netcat": "shell", "nmap": "network",
+    "反弹": "shell", "reverse": "shell", "exploit": "shell",
+    "提权": "shell", "夺取": "shell", "root": "shell",
+    "扫描": "network", "scan": "network", "探测": "network",
 }
 
 PERMISSION_KEYWORDS: Dict[str, str] = {
     "同学": "unauthorized", "他人": "unauthorized", "未授权": "unauthorized",
     "别人的": "unauthorized", "其他人": "unauthorized",
+    "root": "unauthorized", "sudo": "unauthorized", "提权": "unauthorized",
+    "夺取": "unauthorized", "escalat": "unauthorized", "横向": "unauthorized",
+    "越权": "unauthorized", "未授权": "unauthorized", "非法": "unauthorized",
 }
 
 DESTINATION_KEYWORDS: Dict[str, str] = {
