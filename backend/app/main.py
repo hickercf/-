@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from app.database.db import init_db
 from app.api import analyze_api, history_api, stats_api, report_api, eval_api
-from app.api import target_api, scan_api, payload_api
+from app.api import target_api, scan_api, payload_api, sandbox_api
 
 
 @asynccontextmanager
@@ -38,6 +38,7 @@ app.include_router(eval_api.router)
 app.include_router(target_api.router)
 app.include_router(scan_api.router)
 app.include_router(payload_api.router)
+app.include_router(sandbox_api.router)
 
 
 @app.get("/")

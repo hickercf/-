@@ -18,6 +18,7 @@
       <TargetPage v-if="activeTab === 'targets'" />
       <ScanConsolePage v-if="activeTab === 'scan'" />
       <AnalyzePage v-if="activeTab === 'analyze'" />
+      <AttackTracePage v-if="activeTab === 'trace'" />
       <StatsPage v-if="activeTab === 'stats'" />
       <ReportPage v-if="activeTab === 'report'" />
       <EvalPage v-if="activeTab === 'eval'" />
@@ -34,16 +35,18 @@ import ReportPage from './pages/Report.vue'
 import EvalPage from './pages/Evaluation.vue'
 import TargetPage from './pages/TargetPage.vue'
 import ScanConsolePage from './pages/ScanConsole.vue'
+import AttackTracePage from './pages/AttackTrace.vue'
 
 export default {
   name: 'App',
-  components: { AnalyzePage, HistoryPage, StatsPage, ReportPage, EvalPage, TargetPage, ScanConsolePage },
+  components: { AnalyzePage, HistoryPage, StatsPage, ReportPage, EvalPage, TargetPage, ScanConsolePage, AttackTracePage },
   setup() {
     const activeTab = ref('targets')
     const tabs = [
       { key: 'targets', label: '靶标管理' },
       { key: 'scan', label: '扫描控制台' },
       { key: 'analyze', label: '快速审计' },
+      { key: 'trace', label: 'Trace 链路' },
       { key: 'stats', label: '统计图表' },
       { key: 'report', label: '可信报告' },
       { key: 'eval', label: '评测结果' },

@@ -9,7 +9,7 @@ from app.database.db import (
     get_results_by_scan_id, get_scan_stats,
 )
 from app.core.fuzzer_engine import FuzzerEngine
-from app.schemas.scan_schema import ScanStartRequest
+# from app.schemas.scan_schema import ScanStartRequest  # 暂时未使用
 
 router = APIRouter(prefix="/api/scans", tags=["scans"])
 

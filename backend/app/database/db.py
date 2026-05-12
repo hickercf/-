@@ -106,6 +106,39 @@ async def init_db():
         )
     """)
 
+    # evidence_chain 表（SM3 可信存证链）
+    await db.execute("""
+        CREATE TABLE IF NOT EXISTS evidence_chain (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            record_type TEXT,
+            record_ref TEXT,
+            previous_hash TEXT,
+            current_hash TEXT,
+            created_at TEXT
+        )
+    """)
+
+    # scan_results 表（扫描详细结果）
+    await db.execute("""
+        CREATE TABLE IF NOT EXISTS scan_results (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            scan_id TEXT NOT NULL,
+            case_id TEXT,
+            payload_category TEXT,
+            injection_point TEXT,
+            mutations TEXT DEFAULT '[]',
+            trace_id TEXT,
+            risk_score REAL DEFAULT 0,
+            risk_level TEXT,
+            policy_action TEXT,
+            breach_layers TEXT DEFAULT '[]',
+            matched_rules TEXT DEFAULT '[]',
+            record_hash TEXT,
+            created_at TEXT,
+            FOREIGN KEY (scan_id) REFERENCES scan_task(scan_id)
+        )
+    """)
+
     await db.commit()
     await db.close()
 

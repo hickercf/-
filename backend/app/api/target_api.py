@@ -7,7 +7,7 @@ from app.database.db import (
     get_all_targets, update_target, delete_target,
 )
 from app.core.target_manager import TargetManager, AgentTarget, generate_target_id
-from app.schemas.target_schema import TargetCreate, TargetUpdate, TargetResponse
+from app.schemas.target_schema import TargetCreate, TargetUpdate
 
 router = APIRouter(prefix="/api/targets", tags=["targets"])
 

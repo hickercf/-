@@ -3,6 +3,16 @@ from typing import Dict, Any, Optional
 from datetime import datetime
 
 
+def _markdown_escape(text: str) -> str:
+    """转义 Markdown 特殊字符"""
+    if not text:
+        return ""
+    chars = ['\\', '`', '*', '_', '{', '}', '[', ']', '(', ')', '#', '+', '-', '.', '!', '|']
+    for ch in chars:
+        text = text.replace(ch, '\\' + ch)
+    return text
+
+
 def generate_markdown_report(record: Dict[str, Any]) -> str:
     lines = []
     lines.append(f"# AgentGuard 安全审计报告")

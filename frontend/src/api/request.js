@@ -152,4 +152,16 @@ export async function getScanReport(scanId, format = 'json') {
   return res.data
 }
 
+// ── 新增 API: 审计记录（兼容命名）──
+
+export async function getRecords(params = {}) {
+  const res = await api.get('/history', { params })
+  return res.data
+}
+
+export async function getRecord(id) {
+  const res = await api.get(`/history/${id}`)
+  return res.data
+}
+
 export default api

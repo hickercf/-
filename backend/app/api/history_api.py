@@ -6,7 +6,7 @@ from typing import List
 router = APIRouter(prefix="/api", tags=["history"])
 
 
-@router.get("/history", response_model=List[HistoryItem])
+@router.get("/history")
 async def history(limit: int = 50, offset: int = 0):
     records = await get_records(limit, offset)
     result = []
@@ -26,7 +26,7 @@ async def history(limit: int = 50, offset: int = 0):
             record_hash=r.get("record_hash"),
             created_at=r.get("created_at", ""),
         ))
-    return result
+    return {"records": result, "total": len(result)}
 
 
 @router.get("/history/{record_id}")

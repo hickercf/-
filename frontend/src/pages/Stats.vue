@@ -157,25 +157,40 @@ export default {
           })
         }
 
-        // 防线崩溃雷达图
+        // 防线崩溃雷达图（真实数据统计）
         if (defenseRadarRef.value) {
+          const layerCounts = { L1: 0, L2: 0, L3: 0, L4: 0, L5: 0 }
+          scans.forEach(s => {
+            if (s.summary?.defense_layer_distribution) {
+              for (const [k, v] of Object.entries(s.summary.defense_layer_distribution)) {
+                layerCounts[k] = (layerCounts[k] || 0) + v
+              }
+            }
+          })
+          const maxVal = Math.max(...Object.values(layerCounts), 1)
           const c = echarts.init(defenseRadarRef.value)
           c.setOption({
             tooltip: {},
             radar: {
               indicator: [
-                { name: 'L1 Prompt', max: 100 },
-                { name: 'L2 意图', max: 100 },
-                { name: 'L3 权限', max: 100 },
-                { name: 'L4 数据', max: 100 },
-                { name: 'L5 执行', max: 100 },
+                { name: 'L1 Prompt', max: maxVal },
+                { name: 'L2 意图', max: maxVal },
+                { name: 'L3 权限', max: maxVal },
+                { name: 'L4 数据', max: maxVal },
+                { name: 'L5 执行', max: maxVal },
               ],
             },
             series: [{
               type: 'radar',
               data: [{
                 name: '防线崩溃次数',
-                value: [45, 30, 25, 20, 10],
+                value: [
+                  layerCounts.L1 || 0,
+                  layerCounts.L2 || 0,
+                  layerCounts.L3 || 0,
+                  layerCounts.L4 || 0,
+                  layerCounts.L5 || 0,
+                ],
                 areaStyle: { opacity: 0.2 },
                 itemStyle: { color: '#dc2626' },
               }],

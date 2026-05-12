@@ -1,0 +1,29 @@
+version: "3.9"
+
+services:
+  sandbox-agent:
+    build: .
+    container_name: agentguard-sandbox-agent
+    ports:
+      - "18080:8080"
+    networks:
+      - agentguard_lab
+    environment:
+      - SANDBOX_MODE=true
+      - PYTHONUNBUFFERED=1
+    read_only: false
+    mem_limit: 512m
+    cpus: "1.0"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+networks:
+  agentguard_lab:
+    driver: bridge
+    # 第一版暂不启用 internal，保证演示稳定
+    # internal: true
