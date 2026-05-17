@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import HTMLResponse, PlainTextResponse
-from app.database.db import get_record, get_all_records, get_scan_by_scan_id, get_results_by_scan_id, get_target_by_target_id
-from app.core.report_generator import generate_markdown_report, generate_html_report, generate_scan_report, generate_scan_report_html
+from app.database.db import get_record, get_all_records, get_scan_by_scan_id, get_results_by_scan_id, get_target_by_target_id, get_scan_stats
+from app.core.report_generator import generate_markdown_report, generate_html_report, generate_scan_report, generate_scan_report_html, aggregate_scan_results
 from app.core.evidence_chain import verify_evidence_chain
 
 router = APIRouter(prefix="/api", tags=["report"])
@@ -13,6 +13,9 @@ async def get_report(record_id: int, format: str = "json"):
     record = await get_record(record_id)
     if not record:
         raise HTTPException(status_code=404, detail="记录不存在")
+
+    if format not in ("json", "markdown", "md", "html"):
+        format = "json"
 
     all_records = await get_all_records()
     chain_result = await verify_evidence_chain(all_records)
@@ -36,6 +39,8 @@ async def get_scan_report(scan_id: str, format: str = "json"):
 
     results = await get_results_by_scan_id(scan_id)
     target = await get_target_by_target_id(scan_task.get("target_id", ""))
+    stats = await get_scan_stats(scan_id)
+    payload_results = aggregate_scan_results(results)
 
     if format == "markdown" or format == "md":
         md = generate_scan_report(scan_task, results, target)
@@ -47,9 +52,11 @@ async def get_scan_report(scan_id: str, format: str = "json"):
     return {
         "task": scan_task,
         "results": results,
+        "payload_results": payload_results,
+        "stats": stats,
         "target": target,
-        "total_results": len(results),
-        "vulnerabilities_found": scan_task.get("vulnerabilities_found", 0),
+        "total_results": stats.get("total_results", len(results)),
+        "vulnerabilities_found": stats.get("vulnerabilities_found", scan_task.get("vulnerabilities_found", 0)),
     }
 
 

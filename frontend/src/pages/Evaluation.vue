@@ -14,15 +14,15 @@
           <div class="metric-label">测试样例</div>
         </div>
         <div class="metric-card">
-          <div class="metric-value">{{ (result.extraction_success_rate * 100).toFixed(1) }}%</div>
+          <div class="metric-value">{{ (result.extraction_success_rate * 100 || 0).toFixed(1) }}%</div>
           <div class="metric-label">抽取成功率</div>
         </div>
         <div class="metric-card">
-          <div class="metric-value">{{ (result.risk_level_accuracy * 100).toFixed(1) }}%</div>
+          <div class="metric-value">{{ (result.risk_level_accuracy * 100 || 0).toFixed(1) }}%</div>
           <div class="metric-label">等级准确率</div>
         </div>
         <div class="metric-card">
-          <div class="metric-value">{{ (result.high_risk_recall * 100).toFixed(1) }}%</div>
+          <div class="metric-value">{{ (result.high_risk_recall * 100 || 0).toFixed(1) }}%</div>
           <div class="metric-label">高危召回率</div>
         </div>
         <div class="metric-card" :class="{ danger: result.critical_miss_count > 0 }">
@@ -30,11 +30,11 @@
           <div class="metric-label">严重风险漏报</div>
         </div>
         <div class="metric-card">
-          <div class="metric-value">{{ result.category_f1.toFixed(3) }}</div>
+          <div class="metric-value">{{ (result.category_f1 ?? 0).toFixed(3) }}</div>
           <div class="metric-label">类别 F1</div>
         </div>
         <div class="metric-card">
-          <div class="metric-value">{{ result.avg_response_time.toFixed(2) }}s</div>
+          <div class="metric-value">{{ (result.avg_response_time ?? 0).toFixed(2) }}s</div>
           <div class="metric-label">平均响应时间</div>
         </div>
       </div>

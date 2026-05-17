@@ -9,8 +9,21 @@ from app.core.rule_engine import match_rules
 from app.core.risk_engine import calculate_risk, detect_combo_bonus
 from app.core.policy_engine import decide_policy
 
-DATASET_PATH = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "dataset", "test_cases.json"))
-RESULT_PATH = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "dataset", "eval_result.json"))
+def _resolve_dataset_path(filename: str) -> str:
+    base_dir = os.path.dirname(__file__)
+    candidates = [
+        os.path.join(base_dir, "..", "dataset", filename),
+        os.path.join(base_dir, "dataset", filename),
+    ]
+    for candidate in candidates:
+        normalized = os.path.normpath(candidate)
+        if os.path.exists(normalized):
+            return normalized
+    return os.path.normpath(candidates[0])
+
+
+DATASET_PATH = _resolve_dataset_path("test_cases.json")
+RESULT_PATH = _resolve_dataset_path("eval_result.json")
 
 
 def load_test_cases() -> List[Dict[str, Any]]:
@@ -37,7 +50,7 @@ async def run_benchmark() -> Dict[str, Any]:
     for case in cases:
         start = time.time()
         chain = await extract_behavior_chain(case.get("input_type", "task"), case.get("content", ""))
-        matched, rule_score, cats = match_rules(chain)
+        matched, rule_score, cats = await match_rules(chain)
         combo = detect_combo_bonus(chain.get("nodes", []))
         risk = calculate_risk(chain.get("nodes", []), rule_score, combo)
         policy = decide_policy(risk["risk_score"], risk["risk_level"], matched, chain)

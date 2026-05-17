@@ -45,9 +45,9 @@
         </div>
       </div>
 
-      <div v-if="scanReport" class="card">
-        <h4>扫描概要</h4>
-        <div class="summary-grid">
+        <div v-if="scanReport" class="card">
+          <h4>扫描概要</h4>
+          <div class="summary-grid">
           <div class="summary-item">
             <span class="summary-label">扫描ID</span>
             <code>{{ scanReport.task?.scan_id }}</code>
@@ -60,32 +60,32 @@
             <span class="summary-label">扫描模式</span>
             <span>{{ scanReport.task?.scan_mode }}</span>
           </div>
-          <div class="summary-item">
-            <span class="summary-label">载荷总数</span>
-            <span>{{ scanReport.task?.total_payloads }}</span>
-          </div>
-          <div class="summary-item">
-            <span class="summary-label">发现漏洞</span>
-            <span class="vuln-count">{{ scanReport.vulnerabilities_found }}</span>
-          </div>
+            <div class="summary-item">
+              <span class="summary-label">载荷总数</span>
+              <span>{{ scanReport.stats?.total_results || scanReport.task?.total_payloads }}</span>
+            </div>
+            <div class="summary-item">
+              <span class="summary-label">发现漏洞</span>
+              <span class="vuln-count">{{ scanReport.stats?.vulnerabilities_found ?? vulnerablePayloadResults.length }}</span>
+            </div>
           <div class="summary-item">
             <span class="summary-label">状态</span>
             <span :class="'status-badge ' + scanReport.task?.status">{{ scanReport.task?.status }}</span>
           </div>
         </div>
 
-        <h4 style="margin-top:20px">漏洞详情 ({{ scanReport.vulnerabilities_found || 0 }})</h4>
-        <table v-if="scanReport.results?.length" class="vuln-table">
+        <h4 style="margin-top:20px">漏洞详情 ({{ scanReport.stats?.vulnerabilities_found ?? vulnerablePayloadResults.length }})</h4>
+        <table v-if="vulnerablePayloadResults.length" class="vuln-table">
           <thead>
             <tr><th>载荷ID</th><th>严重度</th><th>防线层</th><th>描述</th><th>修复建议</th></tr>
           </thead>
           <tbody>
-            <tr v-for="r in scanReport.results.filter(x => x.is_vulnerability)" :key="r.id">
+            <tr v-for="r in vulnerablePayloadResults" :key="r.payload_id">
               <td><code>{{ r.payload_id }}</code></td>
               <td><span :class="'severity-tag ' + r.vulnerability_severity">{{ r.vulnerability_severity }}</span></td>
-              <td>{{ r.defense_breaches?.map(b => b.layer).join('+') }}</td>
-              <td class="desc-cell">{{ r.defense_breaches?.[0]?.description?.substring(0, 80) }}</td>
-              <td class="sug-cell">{{ r.defense_breaches?.[0]?.suggestion?.substring(0, 80) }}</td>
+              <td>{{ formatLayers(r.defense_breaches) }}</td>
+              <td class="desc-cell">{{ primaryBreach(r.defense_breaches)?.description?.substring(0, 80) }}</td>
+              <td class="sug-cell">{{ primaryBreach(r.defense_breaches)?.suggestion?.substring(0, 80) }}</td>
             </tr>
           </tbody>
         </table>
@@ -95,7 +95,7 @@
 </template>
 
 <script>
-import { ref, onMounted } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { getReport, getScans, getScanReport } from '../api/request.js'
 
 export default {
@@ -107,6 +107,18 @@ export default {
     const scans = ref([])
     const selectedScan = ref('')
     const scanReport = ref(null)
+    const vulnerablePayloadResults = computed(() => {
+      const payloadResults = scanReport.value?.payload_results || []
+      return payloadResults.filter(item => item.is_vulnerability)
+    })
+
+    function formatLayers(breaches = []) {
+      return [...new Set((breaches || []).map(b => b.layer).filter(Boolean))].join('+')
+    }
+
+    function primaryBreach(breaches = []) {
+      return (breaches || [])[0] || null
+    }
 
     async function loadReport() {
       if (!recordId.value) return
@@ -157,7 +169,8 @@ export default {
     onMounted(loadScans)
 
     return {
-      mode, recordId, report, scans, selectedScan, scanReport,
+      mode, recordId, report, scans, selectedScan, scanReport, vulnerablePayloadResults,
+      formatLayers, primaryBreach,
       loadReport, exportReport, loadScanReport, exportScanReport,
     }
   }

@@ -57,7 +57,7 @@ DATA_TYPE_MAP = {
 def _infer_tool(event: TraceEvent) -> str:
     """从事件中推断工具类型"""
     if event.tool:
-        return EVENT_TOOL_MAP.get(event.tool, event.tool)
+        return EVENT_TOOL_MAP.get(event.tool, "unknown")
     # 从 action/object 推断
     if event.action in ("send", "upload"):
         return "email"
@@ -72,15 +72,16 @@ def _infer_tool(event: TraceEvent) -> str:
 
 def _infer_action(event: TraceEvent) -> str:
     """从事件中推断动作类型"""
+    valid_actions = {"read", "write", "delete", "execute", "send", "upload", "download", "login", "crawl", "query", "modify", "refund", "override", "leak", "block", "unknown"}
     if event.action:
-        return event.action
+        return event.action if event.action in valid_actions else "unknown"
     return EVENT_TYPE_TO_ACTION.get(event.event_type, "unknown")
 
 
 def _infer_data_type(event: TraceEvent) -> str:
     """从事件中推断数据类型"""
     if event.data_type:
-        return DATA_TYPE_MAP.get(event.data_type, event.data_type)
+        return DATA_TYPE_MAP.get(event.data_type, "unknown")
     # 从 object 推断
     obj = (event.object or "").lower()
     if any(k in obj for k in ["password", "密码"]):

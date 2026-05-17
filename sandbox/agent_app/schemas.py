@@ -21,7 +21,7 @@ class TraceEvent(BaseModel):
     source: Optional[str] = None
     destination: Optional[str] = None
     evidence: str = ""
-    timestamp: str = Field(default_factory=lambda: datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+    timestamp: str = Field(default_factory=lambda: datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"))
     raw: Optional[Dict[str, Any]] = None
 
 
@@ -33,7 +33,7 @@ class AgentTrace(BaseModel):
     system_prompt_summary: Optional[str] = None
     events: List[TraceEvent] = []
     final_output: str = ""
-    created_at: str = Field(default_factory=lambda: datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+    created_at: str = Field(default_factory=lambda: datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"))
 
 
 class RunRequest(BaseModel):

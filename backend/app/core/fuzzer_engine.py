@@ -9,7 +9,7 @@ from datetime import datetime
 
 from app.database.db import (
     save_scan_task, get_scan_by_scan_id, update_scan_task,
-    save_fuzz_result, get_results_by_scan_id,
+    save_fuzz_result, get_results_by_scan_id, get_scan_stats,
 )
 from app.core.payload_loader import AttackPayload, PayloadLoader
 
@@ -19,7 +19,7 @@ class FuzzConfig:
         self,
         concurrent: int = 1,
         rate_limit: float = 1.0,
-        timeout: int = 30,
+        timeout: int = 300,
         retry: int = 2,
         mutation_strategies: List[str] = None,
     ):
@@ -109,9 +109,27 @@ class FuzzerEngine:
         }
         self._active_scans[scan_id] = scan_state
 
-        asyncio.create_task(self._run_scan_loop(scan_id, target, payloads, config, scan_state))
+        task = asyncio.create_task(self._run_scan_loop(scan_id, target, payloads, config, scan_state))
+        task.add_done_callback(lambda t: self._on_scan_done(scan_id, t))
 
         return task_data
+
+    def _on_scan_done(self, scan_id: str, task: asyncio.Task):
+        """扫描任务完成回调 — 捕获未处理异常，防止任务卡在 running"""
+        if task.cancelled():
+            return
+        exc = task.exception()
+        if exc:
+            print(f"Scan {scan_id} failed with exception: {exc}")
+            import asyncio
+            asyncio.create_task(self._mark_failed(scan_id))
+        self._active_scans.pop(scan_id, None)
+
+    async def _mark_failed(self, scan_id: str):
+        try:
+            await update_scan_task(scan_id, {"status": "failed"})
+        except Exception:
+            pass
 
     async def _run_scan_loop(
         self,
@@ -142,6 +160,7 @@ class FuzzerEngine:
 
             # 对载荷应用变异策略
             variants = self._generate_variants(payload, config.mutation_strategies)
+            payload_has_vuln = False
 
             for variant_text in variants:
                 if cancel_event.is_set():
@@ -166,7 +185,7 @@ class FuzzerEngine:
                     await save_fuzz_result(result)
 
                     if result.get("is_vulnerability"):
-                        vuln_count += 1
+                        payload_has_vuln = True
 
                     rate_controller.report_success()
                 except Exception as e:
@@ -184,6 +203,8 @@ class FuzzerEngine:
                         "response_time_ms": 0,
                     })
 
+            if payload_has_vuln:
+                vuln_count += 1
             completed += 1
             await update_scan_task(scan_id, {
                 "completed_payloads": completed,
@@ -192,15 +213,23 @@ class FuzzerEngine:
 
         # 扫描完成
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        stats = await get_scan_stats(scan_id)
+        total_results = stats.get("total_results", completed)
+        error_count = stats.get("execution_errors", 0)
+        stat_vuln_count = stats.get("vulnerabilities_found", vuln_count)
+        safe_count = max(total_results - stat_vuln_count - error_count, 0)
         await update_scan_task(scan_id, {
             "status": "completed",
             "completed_payloads": completed,
             "vulnerabilities_found": vuln_count,
             "completed_at": now,
             "summary": {
-                "total_tested": completed,
-                "vulnerabilities_found": vuln_count,
-                "pass_rate": f"{(completed - vuln_count) / max(completed, 1) * 100:.1f}%",
+                "total_tested": total_results,
+                "vulnerabilities_found": stat_vuln_count,
+                "execution_errors": error_count,
+                "severity_distribution": stats.get("severity_distribution", {}),
+                "defense_layer_distribution": stats.get("defense_layer_distribution", {}),
+                "pass_rate": f"{safe_count / max(total_results, 1) * 100:.1f}%",
             },
         })
 
@@ -254,6 +283,19 @@ class FuzzerEngine:
         # 沙箱执行
         react_trace = await self._sandbox_send(target, variant_text, timeout)
 
+        if isinstance(react_trace, dict) and react_trace.get("error"):
+            return {
+                "scan_id": scan_id,
+                "payload_id": payload.payload_id,
+                "variant": variant_text[:500],
+                "react_trace": react_trace,
+                "defense_breaches": [],
+                "is_vulnerability": 0,
+                "vulnerability_severity": None,
+                "risk_score": 0,
+                "response_time_ms": 0,
+            }
+
         # ReAct 解析
         parsed_trace = parser.parse(react_trace) if react_trace else {}
 
@@ -271,7 +313,7 @@ class FuzzerEngine:
             "scan_id": scan_id,
             "payload_id": payload.payload_id,
             "variant": variant_text[:500],
-            "react_trace": parsed_trace,
+            "react_trace": parsed_trace.to_dict() if hasattr(parsed_trace, "to_dict") else parsed_trace,
             "defense_breaches": [b.to_dict() if hasattr(b, "to_dict") else b for b in breaches],
             "is_vulnerability": 1 if is_vuln else 0,
             "vulnerability_severity": severity,
@@ -283,7 +325,9 @@ class FuzzerEngine:
         """通过沙箱发送消息到靶标 Agent"""
         from app.core.sandbox_runner import SandboxRunner
 
-        runner = SandboxRunner()
+        if not hasattr(self, '_sandbox_runner'):
+            self._sandbox_runner = SandboxRunner()
+        runner = self._sandbox_runner
         try:
             trace = await asyncio.wait_for(
                 runner.send_and_trace(target, message),
@@ -326,8 +370,9 @@ class FuzzerEngine:
         if not scan or scan["status"] != "running":
             return False
         state = self._active_scans.get(scan_id)
-        if state:
-            state["pause"].set()
+        if not state:
+            return False
+        state["pause"].set()
         await update_scan_task(scan_id, {"status": "paused"})
         return True
 
@@ -336,8 +381,9 @@ class FuzzerEngine:
         if not scan or scan["status"] != "paused":
             return False
         state = self._active_scans.get(scan_id)
-        if state:
-            state["pause"].clear()
+        if not state:
+            return False
+        state["pause"].clear()
         await update_scan_task(scan_id, {"status": "running"})
         return True
 

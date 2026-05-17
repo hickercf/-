@@ -1,8 +1,8 @@
 import os
-import json
 from typing import Dict, Any, Optional
 from dotenv import load_dotenv
-from pydantic import BaseModel, Field
+from app.core.json_utils import parse_json_output
+from app.core.llm_client import chat_completion_text, safe_log
 
 load_dotenv()
 
@@ -12,18 +12,25 @@ LLM_BASE_URL = os.getenv("LLM_BASE_URL", "https://api.deepseek.com/v1")
 LLM_MODEL = os.getenv("LLM_MODEL", "deepseek-chat")
 
 
-class LLMExplanation(BaseModel):
-    reason: str = Field(description="用中文解释为什么检测到风险，指出具体行为链路")
-    suggestion: str = Field(description="用中文给出修复建议和最小权限建议")
-    safe_alternative: str = Field(default="", description="如果适用，给出安全的替代方案")
+SYSTEM_PROMPT = """你是 AgentGuard 安全审计系统的解释生成器。根据审计结果生成用户可读的风险解释和修复建议。
+
+请用中文回答，输出格式必须是有效的 JSON：
+{{
+  "reason": "用中文解释为什么检测到风险，指出具体行为链路",
+  "suggestion": "用中文给出修复建议和最小权限建议",
+  "safe_alternative": "如果适用，给出安全的替代方案（可选）"
+}}
+
+注意：
+- 只输出 JSON，不要输出 markdown 代码块标记
+- reason 必须具体，指出攻击手法和影响
+- suggestion 必须可操作，给出具体步骤"""
 
 
 def _build_chain():
-    from langchain_openai import ChatOpenAI
-    from langchain_core.output_parsers import PydanticOutputParser
     from langchain_core.prompts import ChatPromptTemplate
 
-    llm = ChatOpenAI(
+    llm = build_chat_llm(
         model=LLM_MODEL,
         api_key=LLM_API_KEY,
         base_url=LLM_BASE_URL,
@@ -31,10 +38,8 @@ def _build_chain():
         max_tokens=1000,
     )
 
-    parser = PydanticOutputParser(pydantic_object=LLMExplanation)
-
     prompt = ChatPromptTemplate.from_messages([
-        ("system", "你是 AgentGuard 安全审计系统的解释生成器。根据审计结果生成用户可读的风险解释和修复建议。\n\n{format_instructions}"),
+        ("system", SYSTEM_PROMPT),
         ("human", """原始输入: {content}
 风险分数: {risk_score}
 风险等级: {risk_level}
@@ -42,11 +47,12 @@ def _build_chain():
 风险类别: {categories}
 策略: {policy_action}
 行为节点:
-{nodes_desc}"""),
+{nodes_desc}
+
+请根据以上信息生成 JSON 格式的风险解释和修复建议。"""),
     ])
 
-    partial_prompt = prompt.partial(format_instructions=parser.get_format_instructions())
-    chain = partial_prompt | llm | parser
+    chain = prompt | llm
     return chain
 
 
@@ -54,10 +60,7 @@ _chain_cache = None
 
 
 def _get_chain():
-    global _chain_cache
-    if _chain_cache is None:
-        _chain_cache = _build_chain()
-    return _chain_cache
+    return _build_chain()
 
 
 async def generate_explanation(
@@ -82,32 +85,59 @@ async def _generate_by_llm(
     risk_result: Dict[str, Any],
     policy_decision: Dict[str, Any],
 ) -> Optional[Dict[str, str]]:
-    try:
-        chain = _get_chain()
+    for attempt in range(2):
+        try:
+            rule_names = ", ".join([r.get("name", "") for r in matched_rules])
+            categories = ", ".join(list(set(r.get("category", "") for r in matched_rules)))
+            nodes_desc = []
+            for n in graph.get("nodes", []):
+                nodes_desc.append("- 工具:%s 动作:%s 对象:%s 数据类型:%s 目标:%s" % (n.get("tool"), n.get("action"), n.get("object"), n.get("data_type"), n.get("destination")))
 
-        rule_names = ", ".join([r.get("name", "") for r in matched_rules])
-        categories = ", ".join(list(set(r.get("category", "") for r in matched_rules)))
-        nodes_desc = []
-        for n in graph.get("nodes", []):
-            nodes_desc.append("- 工具:%s 动作:%s 对象:%s 数据类型:%s 目标:%s" % (n.get("tool"), n.get("action"), n.get("object"), n.get("data_type"), n.get("destination")))
+            user_prompt = """原始输入: {content}
+风险分数: {risk_score}
+风险等级: {risk_level}
+命中规则: {rule_names}
+风险类别: {categories}
+策略: {policy_action}
+行为节点:
+{nodes_desc}
 
-        result = await chain.ainvoke({
-            "content": content,
-            "risk_score": str(risk_result.get("risk_score", "")),
-            "risk_level": risk_result.get("risk_level", ""),
-            "rule_names": rule_names,
-            "categories": categories,
-            "policy_action": policy_decision.get("action", ""),
-            "nodes_desc": "\n".join(nodes_desc),
-        })
+请根据以上信息生成 JSON 格式的风险解释和修复建议。""".format(
+                content=content,
+                risk_score=str(risk_result.get("risk_score", "")),
+                risk_level=risk_result.get("risk_level", ""),
+                rule_names=rule_names,
+                categories=categories,
+                policy_action=policy_decision.get("action", ""),
+                nodes_desc="\n".join(nodes_desc),
+            )
+            text = await chat_completion_text(
+                model=LLM_MODEL,
+                api_key=LLM_API_KEY,
+                base_url=LLM_BASE_URL,
+                temperature=0.3,
+                max_tokens=1000,
+                messages=[
+                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "user", "content": user_prompt},
+                ],
+            )
+            parsed = parse_json_output(text)
 
-        return {
-            "reason": result.reason,
-            "suggestion": result.suggestion,
-            "safe_alternative": result.safe_alternative,
-        }
-    except Exception as e:
-        print(f"LLM explanation failed: %s" % e)
+            if parsed and "reason" in parsed and "suggestion" in parsed:
+                return {
+                    "reason": parsed["reason"],
+                    "suggestion": parsed["suggestion"],
+                    "safe_alternative": parsed.get("safe_alternative", ""),
+                }
+
+            safe_log(f"LLM output parsing failed. Raw output: {text[:200]}")
+            return None
+
+        except Exception as e:
+            if attempt == 0:
+                continue
+            safe_log(f"LLM explanation failed: {e}")
         return None
 
 

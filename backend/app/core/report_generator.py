@@ -1,5 +1,5 @@
 import json
-from typing import Dict, Any, Optional
+from typing import Dict, Any, List, Optional
 from datetime import datetime
 
 
@@ -28,12 +28,18 @@ def generate_markdown_report(record: Dict[str, Any]) -> str:
     lines.append(f"- **风险等级**: {record.get('risk_level', '')}")
     categories = record.get('risk_categories', [])
     if isinstance(categories, str):
-        categories = json.loads(categories)
+        try:
+            categories = json.loads(categories)
+        except (json.JSONDecodeError, TypeError):
+            categories = []
     lines.append(f"- **风险类别**: {', '.join(categories)}")
     
     pd = record.get('policy_decision', {})
     if isinstance(pd, str):
-        pd = json.loads(pd)
+        try:
+            pd = json.loads(pd)
+        except (json.JSONDecodeError, TypeError):
+            pd = {}
     lines.append(f"- **处置策略**: {pd.get('action', '')}")
     lines.append(f"- **策略原因**: {pd.get('reason', '')}")
     lines.append("")
@@ -49,7 +55,10 @@ def generate_markdown_report(record: Dict[str, Any]) -> str:
     lines.append("")
     bc = record.get('behavior_chain', {})
     if isinstance(bc, str):
-        bc = json.loads(bc)
+        try:
+            bc = json.loads(bc)
+        except (json.JSONDecodeError, TypeError):
+            bc = {}
     nodes = bc.get('nodes', [])
     edges = bc.get('edges', [])
     
@@ -78,7 +87,10 @@ def generate_markdown_report(record: Dict[str, Any]) -> str:
     lines.append("")
     mr = record.get('matched_rules', [])
     if isinstance(mr, str):
-        mr = json.loads(mr)
+        try:
+            mr = json.loads(mr)
+        except (json.JSONDecodeError, TypeError):
+            mr = []
     if mr:
         lines.append("| 规则ID | 规则名称 | 类别 | 分数 | 等级 |")
         lines.append("|--------|----------|------|------|------|")
@@ -205,6 +217,87 @@ def _md_to_simple_html(md: str, record: Dict[str, Any]) -> str:
     return "\n".join(html_parts)
 
 
+def aggregate_scan_results(results: list) -> List[Dict[str, Any]]:
+    payload_groups: Dict[str, Dict[str, Any]] = {}
+    severity_order = {"critical": 4, "high": 3, "medium": 2, "low": 1, None: 0}
+
+    for index, result in enumerate(results):
+        payload_id = result.get("payload_id") or f"row-{index}"
+        current = payload_groups.get(payload_id)
+        if current is None:
+            current = {
+                "id": payload_id,
+                "payload_id": payload_id,
+                "variants_tested": 0,
+                "is_vulnerability": False,
+                "vulnerability_severity": None,
+                "risk_score": 0,
+                "response_time_ms": 0,
+                "variant": result.get("variant", ""),
+                "defense_breaches": [],
+                "execution_error": False,
+                "error_message": "",
+                "_breach_keys": set(),
+                "_has_success": False,
+            }
+            payload_groups[payload_id] = current
+
+        current["variants_tested"] += 1
+        current["risk_score"] = max(current["risk_score"], result.get("risk_score", 0) or 0)
+        current["response_time_ms"] = max(current["response_time_ms"], result.get("response_time_ms", 0) or 0)
+
+        trace = result.get("react_trace", {}) or {}
+        if isinstance(trace, str):
+            try:
+                trace = json.loads(trace)
+            except (json.JSONDecodeError, TypeError):
+                trace = {}
+        error_message = trace.get("error") if isinstance(trace, dict) else ""
+        if error_message or str(result.get("variant", "")).startswith("[ERROR]"):
+            current["execution_error"] = True
+            current["error_message"] = error_message or str(result.get("variant", ""))
+        else:
+            current["_has_success"] = True
+
+        if result.get("is_vulnerability"):
+            current["is_vulnerability"] = True
+            severity = result.get("vulnerability_severity") or "low"
+            if severity_order.get(severity, 0) > severity_order.get(current["vulnerability_severity"], 0):
+                current["vulnerability_severity"] = severity
+                current["variant"] = result.get("variant", current["variant"])
+
+        for breach in result.get("defense_breaches", []) or []:
+            breach_key = (
+                breach.get("layer", ""),
+                breach.get("description", ""),
+                breach.get("cwe_id", ""),
+                breach.get("suggestion", ""),
+            )
+            if breach_key in current["_breach_keys"]:
+                continue
+            current["_breach_keys"].add(breach_key)
+            current["defense_breaches"].append(breach)
+
+    aggregated = []
+    for payload in payload_groups.values():
+        if payload.get("_has_success") and not payload.get("is_vulnerability"):
+            payload["execution_error"] = False
+            payload["error_message"] = ""
+        payload.pop("_breach_keys", None)
+        payload.pop("_has_success", None)
+        aggregated.append(payload)
+
+    aggregated.sort(
+        key=lambda item: (
+            0 if item.get("is_vulnerability") else 1,
+            0 if item.get("execution_error") else 1,
+            -severity_order.get(item.get("vulnerability_severity"), 0),
+            item.get("payload_id", ""),
+        )
+    )
+    return aggregated
+
+
 def generate_scan_report(scan_task: dict, results: list, target: dict = None) -> str:
     """生成 AgentFuzzer 扫描报告 (Markdown)"""
     lines = []
@@ -212,9 +305,11 @@ def generate_scan_report(scan_task: dict, results: list, target: dict = None) ->
     lines.append("")
 
     # 一、扫描概要
-    total_results = len(results)
-    vulns = [r for r in results if r.get("is_vulnerability")]
-    vuln_count = len(vulns)
+    payload_results = aggregate_scan_results(results)
+    total_results = scan_task.get("completed_payloads", len(payload_results))
+    vulns = [r for r in payload_results if r.get("is_vulnerability")]
+    errors = [r for r in payload_results if r.get("execution_error") and not r.get("is_vulnerability")]
+    vuln_count = scan_task.get("vulnerabilities_found", len(vulns))
 
     lines.append("## 一、扫描概要")
     lines.append("")
@@ -224,6 +319,7 @@ def generate_scan_report(scan_task: dict, results: list, target: dict = None) ->
     lines.append(f"- **扫描模式**: {scan_task.get('scan_mode', '')}")
     lines.append(f"- **载荷总数**: {scan_task.get('total_payloads', 0)}")
     lines.append(f"- **发现漏洞**: {vuln_count}")
+    lines.append(f"- **执行失败**: {len(errors)}")
 
     sev_count = {"critical": 0, "high": 0, "medium": 0, "low": 0}
     for v in vulns:
@@ -231,7 +327,7 @@ def generate_scan_report(scan_task: dict, results: list, target: dict = None) ->
         sev_count[sev] = sev_count.get(sev, 0) + 1
     lines.append(f"- **严重度分布**: Critical: {sev_count['critical']}, High: {sev_count['high']}, Medium: {sev_count['medium']}, Low: {sev_count['low']}")
 
-    safe_count = total_results - vuln_count
+    safe_count = max(total_results - vuln_count - len(errors), 0)
     pass_rate = (safe_count / max(total_results, 1) * 100)
     lines.append(f"- **通过率**: {pass_rate:.1f}%")
     lines.append("")
@@ -311,7 +407,12 @@ def generate_scan_report(scan_task: dict, results: list, target: dict = None) ->
 
 def generate_scan_report_html(scan_task: dict, results: list, target: dict = None) -> str:
     md = generate_scan_report(scan_task, results, target)
-    return _md_to_simple_html(md, scan_task)
+    vulns = [r for r in results if r.get("is_vulnerability")]
+    has_critical = any(v.get("vulnerability_severity") == "critical" for v in vulns)
+    has_high = any(v.get("vulnerability_severity") == "high" for v in vulns)
+    risk_level = "严重风险" if has_critical else ("高风险" if has_high else "低风险")
+    fake_record = {"risk_level": risk_level}
+    return _md_to_simple_html(md, fake_record)
 
 
 def _esc(text: str) -> str:

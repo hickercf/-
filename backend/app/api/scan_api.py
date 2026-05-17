@@ -9,6 +9,7 @@ from app.database.db import (
     get_results_by_scan_id, get_scan_stats,
 )
 from app.core.fuzzer_engine import get_fuzzer_engine
+from app.core.report_generator import aggregate_scan_results
 # from app.schemas.scan_schema import ScanStartRequest  # 暂时未使用
 
 router = APIRouter(prefix="/api/scans", tags=["scans"])
@@ -16,7 +17,7 @@ router = APIRouter(prefix="/api/scans", tags=["scans"])
 _engine = get_fuzzer_engine()
 
 # WebSocket 连接池
-_active_ws: dict = {}
+_active_ws: dict = {}  # scan_id -> list[WebSocket]
 
 
 @router.get("")
@@ -39,6 +40,7 @@ async def get_scan_detail(scan_id: str):
     return {
         "task": task,
         "results": results,
+        "payload_results": aggregate_scan_results(results),
         "stats": stats,
     }
 
@@ -81,7 +83,9 @@ async def cancel_scan(scan_id: str):
 async def websocket_scan_progress(websocket: WebSocket, scan_id: str):
     """WebSocket 实时推送扫描进度"""
     await websocket.accept()
-    _active_ws[scan_id] = websocket
+    if scan_id not in _active_ws:
+        _active_ws[scan_id] = []
+    _active_ws[scan_id].append(websocket)
 
     try:
         while True:
@@ -90,7 +94,6 @@ async def websocket_scan_progress(websocket: WebSocket, scan_id: str):
                 await websocket.send_json({"error": "任务不存在"})
                 break
 
-            # 获取最新结果
             results = await get_results_by_scan_id(scan_id)
             latest_breaches = []
             if results:
@@ -116,4 +119,8 @@ async def websocket_scan_progress(websocket: WebSocket, scan_id: str):
     except WebSocketDisconnect:
         pass
     finally:
-        _active_ws.pop(scan_id, None)
+        ws_list = _active_ws.get(scan_id, [])
+        if websocket in ws_list:
+            ws_list.remove(websocket)
+        if not ws_list:
+            _active_ws.pop(scan_id, None)

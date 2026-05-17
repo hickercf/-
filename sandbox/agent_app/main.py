@@ -22,7 +22,7 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -52,7 +52,7 @@ async def run_task(req: RunRequest):
         result = agent.run(req.input_text, req.injection_point)
         return RunResponse(trace=result["trace"])
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Agent 执行失败: {str(e)}")
+        raise HTTPException(status_code=500, detail="Agent 执行失败: 内部错误")
 
 
 @app.post("/rag/inject")

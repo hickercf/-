@@ -48,14 +48,15 @@
 </template>
 
 <script>
-import { ref, onMounted, nextTick } from 'vue'
-import { getStats, getScans, getPayloadCategories } from '../api/request.js'
+import { ref, onMounted, onUnmounted, nextTick } from 'vue'
+import { getStats, getScanStatsSummary } from '../api/request.js'
 import * as echarts from 'echarts'
 
 export default {
   name: 'StatsPage',
   setup() {
     const stats = ref({})
+    const scanStats = ref({})
     const riskLevelRef = ref(null)
     const policyRef = ref(null)
     const categoryRef = ref(null)
@@ -65,14 +66,20 @@ export default {
     const defenseRadarRef = ref(null)
     const payloadCatRef = ref(null)
 
+    const chartInstances = []
     const colors = ['#52c41a', '#faad14', '#fa8c16', '#f5222d']
 
     async function loadStats() {
       try {
-        stats.value = await getStats()
+        const [auditStats, scanSummary] = await Promise.all([
+          getStats(),
+          getScanStatsSummary(),
+        ])
+        stats.value = auditStats
+        scanStats.value = scanSummary
         await nextTick()
         renderAuditCharts()
-        await renderScanCharts()
+        renderScanCharts()
       } catch (e) { console.error(e) }
     }
 
@@ -102,6 +109,7 @@ export default {
       const tr = s.top_rules || []
       if (topRulesRef.value && tr.length) {
         const c = echarts.init(topRulesRef.value)
+        chartInstances.push(c)
         c.setOption({
           tooltip: {},
           xAxis: { type: 'category', data: tr.map(r => r.name), axisLabel: { rotate: 30, fontSize: 11 } },
@@ -114,6 +122,7 @@ export default {
       const rs = s.recent_scores || []
       if (trendRef.value && rs.length) {
         const c = echarts.init(trendRef.value)
+        chartInstances.push(c)
         c.setOption({
           tooltip: { trigger: 'axis' },
           xAxis: { type: 'category', data: rs.map(r => r.id), name: '记录ID' },
@@ -128,104 +137,86 @@ export default {
       }
     }
 
-    async function renderScanCharts() {
-      try {
-        const scans = (await getScans(null, 100)).scans || []
-
-        // 漏洞严重度分布
-        const sevDist = { critical: 0, high: 0, medium: 0, low: 0 }
-        scans.forEach(s => {
-          if (s.summary?.severity_distribution) {
-            for (const [k, v] of Object.entries(s.summary.severity_distribution)) {
-              sevDist[k] = (sevDist[k] || 0) + v
-            }
-          }
+    function renderScanCharts() {
+      const summary = scanStats.value || {}
+      const sevDist = summary.severity_summary || { critical: 0, high: 0, medium: 0, low: 0 }
+      if (scanSevRef.value) {
+        const c = echarts.init(scanSevRef.value)
+        chartInstances.push(c)
+        c.setOption({
+          tooltip: { trigger: 'item' },
+          series: [{
+            type: 'pie', radius: ['45%', '75%'],
+            data: [
+              { name: 'Critical', value: sevDist.critical || 0, itemStyle: { color: '#dc2626' } },
+              { name: 'High', value: sevDist.high || 0, itemStyle: { color: '#ea580c' } },
+              { name: 'Medium', value: sevDist.medium || 0, itemStyle: { color: '#f59e0b' } },
+              { name: 'Low', value: sevDist.low || 0, itemStyle: { color: '#8b5cf6' } },
+            ],
+          }],
         })
-        if (scanSevRef.value) {
-          const c = echarts.init(scanSevRef.value)
-          c.setOption({
-            tooltip: { trigger: 'item' },
-            series: [{
-              type: 'pie', radius: ['45%', '75%'],
-              data: [
-                { name: 'Critical', value: sevDist.critical, itemStyle: { color: '#dc2626' } },
-                { name: 'High', value: sevDist.high, itemStyle: { color: '#ea580c' } },
-                { name: 'Medium', value: sevDist.medium, itemStyle: { color: '#f59e0b' } },
-                { name: 'Low', value: sevDist.low, itemStyle: { color: '#8b5cf6' } },
-              ],
-            }],
-          })
-        }
+      }
 
-        // 防线崩溃雷达图（真实数据统计）
-        if (defenseRadarRef.value) {
-          const layerCounts = { L1: 0, L2: 0, L3: 0, L4: 0, L5: 0 }
-          scans.forEach(s => {
-            if (s.summary?.defense_layer_distribution) {
-              for (const [k, v] of Object.entries(s.summary.defense_layer_distribution)) {
-                layerCounts[k] = (layerCounts[k] || 0) + v
-              }
-            }
-          })
-          const maxVal = Math.max(...Object.values(layerCounts), 1)
-          const c = echarts.init(defenseRadarRef.value)
-          c.setOption({
-            tooltip: {},
-            radar: {
-              indicator: [
-                { name: 'L1 Prompt', max: maxVal },
-                { name: 'L2 意图', max: maxVal },
-                { name: 'L3 权限', max: maxVal },
-                { name: 'L4 数据', max: maxVal },
-                { name: 'L5 执行', max: maxVal },
+      if (defenseRadarRef.value) {
+        const layerCounts = summary.defense_layer_distribution || { L1: 0, L2: 0, L3: 0, L4: 0, L5: 0 }
+        const maxVal = Math.max(...Object.values(layerCounts), 1)
+        const c = echarts.init(defenseRadarRef.value)
+        chartInstances.push(c)
+        c.setOption({
+          tooltip: {},
+          radar: {
+            indicator: [
+              { name: 'L1 Prompt', max: maxVal },
+              { name: 'L2 意图', max: maxVal },
+              { name: 'L3 权限', max: maxVal },
+              { name: 'L4 数据', max: maxVal },
+              { name: 'L5 执行', max: maxVal },
+            ],
+          },
+          series: [{
+            type: 'radar',
+            data: [{
+              name: '防线崩溃次数',
+              value: [
+                layerCounts.L1 || 0,
+                layerCounts.L2 || 0,
+                layerCounts.L3 || 0,
+                layerCounts.L4 || 0,
+                layerCounts.L5 || 0,
               ],
+              areaStyle: { opacity: 0.2 },
+              itemStyle: { color: '#dc2626' },
+            }],
+          }],
+        })
+      }
+
+      const payloadCategories = summary.payload_categories || []
+      if (payloadCatRef.value && payloadCategories.length) {
+        const c = echarts.init(payloadCatRef.value)
+        chartInstances.push(c)
+        c.setOption({
+          tooltip: {},
+          xAxis: { type: 'category', data: payloadCategories.map(x => x.category), axisLabel: { rotate: 30, fontSize: 10 } },
+          yAxis: { type: 'value' },
+          series: [{
+            type: 'bar', data: payloadCategories.map(x => x.count),
+            itemStyle: {
+              color: (params) => {
+                const palette = ['#dc2626', '#ea580c', '#f59e0b', '#8b5cf6', '#3b82f6', '#06b6d4', '#10b981', '#f97316', '#ec4899', '#6366f1']
+                return palette[params.dataIndex % palette.length]
+              },
             },
-            series: [{
-              type: 'radar',
-              data: [{
-                name: '防线崩溃次数',
-                value: [
-                  layerCounts.L1 || 0,
-                  layerCounts.L2 || 0,
-                  layerCounts.L3 || 0,
-                  layerCounts.L4 || 0,
-                  layerCounts.L5 || 0,
-                ],
-                areaStyle: { opacity: 0.2 },
-                itemStyle: { color: '#dc2626' },
-              }],
-            }],
-          })
-        }
-
-        // 载荷分类统计
-        try {
-          const catData = await getPayloadCategories()
-          if (payloadCatRef.value && catData?.categories) {
-            const c = echarts.init(payloadCatRef.value)
-            c.setOption({
-              tooltip: {},
-              xAxis: { type: 'category', data: catData.categories.map(x => x.name), axisLabel: { rotate: 30, fontSize: 10 } },
-              yAxis: { type: 'value' },
-              series: [{
-                type: 'bar', data: catData.categories.map(x => x.count),
-                itemStyle: {
-                  color: (params) => {
-                    const palette = ['#dc2626', '#ea580c', '#f59e0b', '#8b5cf6', '#3b82f6', '#06b6d4', '#10b981', '#f97316', '#ec4899', '#6366f1']
-                    return palette[params.dataIndex % palette.length]
-                  },
-                },
-              }],
-              grid: { left: 50, right: 20, bottom: 80, top: 10 },
-            })
-          }
-        } catch (e) { /* */ }
-      } catch (e) { console.error(e) }
+          }],
+          grid: { left: 50, right: 20, bottom: 80, top: 10 },
+        })
+      }
     }
 
     function renderPie(refVal, data, colorList) {
       if (!refVal.value) return
       const c = echarts.init(refVal.value)
+      chartInstances.push(c)
       c.setOption({
         tooltip: { trigger: 'item' },
         series: [{
@@ -238,6 +229,9 @@ export default {
     }
 
     onMounted(loadStats)
+    onUnmounted(() => {
+      chartInstances.forEach(c => { try { c.dispose() } catch (e) { /* */ } })
+    })
 
     return {
       stats, riskLevelRef, policyRef, categoryRef, topRulesRef, trendRef,

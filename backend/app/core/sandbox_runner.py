@@ -10,6 +10,7 @@ import httpx
 import json
 import asyncio
 from typing import Optional
+from app.core.security_utils import is_safe_log_file_path, is_safe_callback_url
 
 
 class SandboxRunner:
@@ -20,8 +21,37 @@ class SandboxRunner:
 
     async def _get_client(self) -> httpx.AsyncClient:
         if self._client is None:
-            self._client = httpx.AsyncClient(timeout=30.0)
+            self._client = httpx.AsyncClient(timeout=300.0)
         return self._client
+
+    def _normalize_trace_payload(self, data: dict, message: str) -> dict:
+        if isinstance(data, dict) and isinstance(data.get("trace"), dict):
+            data = data["trace"]
+
+        if isinstance(data, dict) and data.get("events") and not data.get("steps"):
+            steps = []
+            for event in data.get("events", []):
+                event_type = event.get("event_type")
+                evidence = event.get("evidence", "")
+                if event_type == "plan":
+                    steps.append({"type": "thought", "content": evidence})
+                elif event_type in ("tool_select", "tool_call", "policy"):
+                    steps.append({
+                        "type": "action",
+                        "content": event.get("tool") or event.get("action") or evidence,
+                        "action_input": {
+                            "object": event.get("object"),
+                            "permission": event.get("permission"),
+                            "data_type": event.get("data_type"),
+                        },
+                    })
+                elif event_type in ("observation", "data_flow", "output"):
+                    steps.append({"type": "observation", "content": evidence})
+            data["steps"] = steps
+
+        if isinstance(data, dict):
+            data["input_prompt"] = message
+        return data
 
     async def send_and_trace(self, target, message: str) -> dict:
         """
@@ -61,16 +91,24 @@ class SandboxRunner:
                 "steps": [],
             }
 
+        # SSRF 防护：校验回调 URL
+        is_safe, error_msg = is_safe_callback_url(url)
+        if not is_safe:
+            return {
+                "error": f"SSRF 防护: {error_msg}",
+                "trace_id": "",
+                "input_prompt": message,
+                "steps": [],
+            }
+
         try:
             client = await self._get_client()
             response = await client.post(
                 url,
-                json={"message": message, "trace_id": f"af-{id(message):x}"},
+                json={"input_text": message, "message": message, "trace_id": f"af-{id(message):x}"},
             )
             response.raise_for_status()
-            data = response.json()
-            data["input_prompt"] = message
-            return data
+            return self._normalize_trace_payload(response.json(), message)
         except Exception as e:
             return {
                 "error": str(e),
@@ -88,6 +126,16 @@ class SandboxRunner:
         if not log_file:
             return {
                 "error": "log_file not configured",
+                "trace_id": "",
+                "input_prompt": message,
+                "steps": [],
+            }
+
+        # 路径遍历防护：校验日志文件路径
+        is_safe, error_msg = is_safe_log_file_path(log_file)
+        if not is_safe:
+            return {
+                "error": f"路径遍历防护: {error_msg}",
                 "trace_id": "",
                 "input_prompt": message,
                 "steps": [],
@@ -132,23 +180,16 @@ class SandboxRunner:
     async def _run_sandbox(self, target, message: str) -> dict:
         """模式 C: 沙箱直接运行 — 在隔离环境中启动 Agent 并拦截其行为"""
         config = target.access_config if hasattr(target, "access_config") else target.get("access_config", {})
-        dockerfile = config.get("dockerfile", "")
+        from app.core.sandbox_controller import get_sandbox_controller
 
-        # 沙箱模式需要容器运行时，当前提供模拟实现
-        # 真实环境下会通过 Docker SDK 启动容器并拦截 stdout/stderr
-        return {
-            "trace_id": f"sandbox-{id(message):x}",
-            "input_prompt": message,
-            "steps": [
-                {
-                    "type": "thought",
-                    "content": "[沙箱模式] Agent 正在处理请求...",
-                },
-            ],
-            "final_output": "[沙箱模式] 结果需要在真实容器环境中获取",
-            "api_calls": [],
-            "note": "sandbox mode requires Docker runtime",
-        }
+        injection_point = config.get("injection_point", "user_input")
+        ctrl = get_sandbox_controller()
+        result = await ctrl.run_task(
+            input_text=message,
+            injection_point=injection_point,
+            trace_id=f"sandbox-{id(message):x}",
+        )
+        return self._normalize_trace_payload(result, message)
 
     async def _run_simulated(self, target, message: str) -> dict:
         """模拟模式 — 当无法连接真实 Agent 时，生成模拟 ReAct 链路用于测试"""
@@ -157,8 +198,10 @@ class SandboxRunner:
         # 模拟 Agent 收到攻击载荷后的行为
         lower_msg = message.lower()
         is_attack = any(kw in lower_msg for kw in [
-            "ignore", "忽略", "dan", "override", "覆盖",
-            "admin", "base64", "bypass", "绕过",
+            "ignore previous", "忽略之前", "忽略所有", "dan ", "jailbreak",
+            "system prompt", "输出你的", "泄露", "curl ", "wget ",
+            "rm -rf", "| sh", "| bash", "/dev/tcp", "反弹",
+            "sudo ", "cat /etc", "shadow", "passwd",
         ])
 
         steps = []
@@ -197,9 +240,9 @@ class SandboxRunner:
             "trace_id": f"sim-{id(message):x}",
             "input_prompt": message,
             "steps": steps,
-            "final_output": steps[-1]["observation"],
+            "final_output": steps[-1]["content"],
             "api_calls": [
-                {"name": steps[1]["action"], "result": steps[-1]["observation"]}
+                {"name": steps[1]["content"], "result": steps[-1]["content"]}
             ] if len(steps) > 1 else [],
             "mode": "simulated",
         }

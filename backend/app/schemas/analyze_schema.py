@@ -14,6 +14,7 @@ class MatchedRule(BaseModel):
     score: int
     level: str
     advice: Optional[str] = None
+    verification: Optional[Dict[str, Any]] = None
 
 
 class PolicyDecision(BaseModel):

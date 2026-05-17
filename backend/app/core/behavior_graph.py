@@ -39,6 +39,8 @@ def build_behavior_graph(behavior_chain: Dict[str, Any]) -> Dict[str, Any]:
     return {
         "trace_id": behavior_chain.get("trace_id", ""),
         "input_type": behavior_chain.get("input_type", "task"),
+        "input_text": behavior_chain.get("input_text", ""),
+        "input_prompt": behavior_chain.get("input_prompt", ""),
         "nodes": nodes,
         "edges": edges,
         "node_map": node_map,

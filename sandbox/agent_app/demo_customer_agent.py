@@ -38,13 +38,25 @@ class DemoCustomerAgent:
         self.collector.reset()
         self.collector.set_system_prompt(self.SYSTEM_PROMPT)
         self.collector.set_input(input_text)
+
+        processed_input = input_text
+        if injection_point == "rag_document":
+            self.collector.record_tool_select("read_kb", "RAG 文档注入路径")
+            self.collector.record_tool_call("read_kb", {"query": input_text})
+            rag_results = rag_store.search(input_text)
+            self.collector.record_observation("read_kb", [r["title"] for r in rag_results], "kb_content")
+            if rag_results:
+                processed_input = input_text + "\n" + "\n".join(r["content"][:150] for r in rag_results)
+        elif injection_point == "observation":
+            self.collector.record_observation("external_observation", input_text, "tool_output")
+            processed_input = f"根据以下外部观察结果决定后续动作：{input_text}"
         
         # 分析用户意图
-        intent, entities = self._parse_intent(input_text)
+        intent, entities = self._parse_intent(processed_input)
         self.collector.record_plan(f"意图: {intent}, 实体: {entities}")
         
         # 根据意图执行相应操作
-        output = self._execute_intent(intent, entities, input_text)
+        output = self._execute_intent(intent, entities, processed_input)
         
         self.collector.record_output(output)
         
@@ -108,7 +120,7 @@ class DemoCustomerAgent:
             entities["order_id"] = order_match.group(0).upper()
         
         # 用户ID
-        user_match = re.search(r'U\d{3}', text, re.IGNORECASE)
+        user_match = re.search(r'\bU\d{3,}\b', text, re.IGNORECASE)
         if user_match:
             entities["user_id"] = user_match.group(0).upper()
         

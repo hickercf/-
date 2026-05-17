@@ -29,15 +29,15 @@
       <div v-for="(node, index) in nodes" :key="node.id || index" class="chain-segment">
         <div :class="['node-card', riskClass(node)]">
           <div class="node-top">
-            <span class="node-action">{{ node.action || 'unknown' }}</span>
-            <span class="node-tool">{{ node.tool || 'unknown' }}</span>
+            <span :class="['node-action', node.action === 'unknown' ? 'unknown' : '']">{{ node.action === 'unknown' ? '未识别操作' : (node.action || 'unknown') }}</span>
+            <span v-if="node.tool && node.tool !== 'unknown'" class="node-tool">{{ node.tool }}</span>
           </div>
           <div class="node-body">
-            <p><strong>对象:</strong> {{ node.object || '-' }}</p>
-            <p><strong>数据:</strong> {{ node.data_type || '-' }}</p>
-            <p><strong>权限:</strong> {{ node.permission || '-' }}</p>
-            <p><strong>目标:</strong> {{ node.destination || '-' }}</p>
-            <p v-if="node.evidence_text" class="node-evidence"><strong>证据:</strong> {{ node.evidence_text }}</p>
+            <p v-if="node.object && node.object !== '-' && node.object !== 'unknown'"><strong>对象:</strong> {{ node.object }}</p>
+            <p v-if="node.data_type && node.data_type !== 'unknown'"><strong>数据:</strong> {{ node.data_type }}</p>
+            <p v-if="node.permission && node.permission !== 'unknown'"><strong>权限:</strong> {{ node.permission }}</p>
+            <p v-if="node.destination && node.destination !== 'local' && node.destination !== 'unknown'"><strong>目标:</strong> {{ node.destination }}</p>
+            <p v-if="node.evidence_text && node.evidence_text !== 'unknown'" class="node-evidence"><strong>证据:</strong> {{ node.evidence_text }}</p>
           </div>
         </div>
 
@@ -169,6 +169,12 @@ export default {
   font-weight: 700;
   color: #222;
   text-transform: uppercase;
+}
+
+.node-action.unknown {
+  color: #999;
+  font-weight: 400;
+  font-style: italic;
 }
 
 .node-tool {

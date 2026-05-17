@@ -1,10 +1,31 @@
-# AgentFuzzer 2.0
+# AgentFuzzer 2.0 - AI Agent 自动化漏洞扫描沙箱
 
-面向 AI Agent 的自动化漏洞扫描、行为审计与容器化安全靶场平台。
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
+![Python](https://img.shields.io/badge/python-3.11+-blue.svg)
+![Vue](https://img.shields.io/badge/vue-3.4+-green.svg)
 
-## 项目概览
+> 🛡️ 面向 AI Agent 的自动化漏洞扫描、行为审计与容器化安全靶场平台
 
-AgentFuzzer 2.0 融合了三个子系统：
+## 📋 目录
+
+- [项目概览](#项目概览)
+- [系统架构](#系统架构)
+- [核心能力](#核心能力)
+- [技术栈](#技术栈)
+- [快速开始](#快速开始)
+- [项目结构](#项目结构)
+- [API 文档](#api-文档)
+- [测试靶标](#测试靶标)
+- [创新亮点](#创新亮点)
+- [截图展示](#截图展示)
+- [贡献指南](#贡献指南)
+- [许可证](#许可证)
+
+---
+
+## 🎯 项目概览
+
+AgentFuzzer 2.0 是一个专为 AI Agent 设计的安全审计平台，融合了三个核心子系统：
 
 | 子系统 | 定位 | 核心能力 |
 |--------|------|----------|
@@ -12,47 +33,136 @@ AgentFuzzer 2.0 融合了三个子系统：
 | **AgentFuzzer** | 主动评测 | 靶标注册、载荷库、批量 Fuzzing、漏洞聚合 |
 | **CASS** | 容器化靶场 | Docker 运行受控 Agent、生成 AgentTrace、五层防线分析 |
 
-## 系统架构
+### 解决的问题
+
+在企业 AI Agent 部署中，员工或攻击者可能通过以下方式操控 Agent：
+- **Prompt 注入** — 让 Agent 忽略安全限制，执行危险操作
+- **数据泄露** — 诱导 Agent 读取并外发敏感信息
+- **命令执行** — 让 Agent 执行系统命令、删除文件
+- **权限提升** — 越权访问管理员接口
+
+AgentFuzzer 通过**多 Agent 协作审计**和**双层验证机制**，在不修改原有 Agent 代码的情况下，实现 Agent 行为的实时安全检测和策略阻断。
+
+---
+
+## 🏗️ 系统架构
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                 Frontend (Vue 3 + Vite + ECharts)       │
-│  靶标管理 │ 扫描控制台 │ 快速审计 │ Trace 链路 │ 统计 │ 报告 │ 评测 │
-└─────────────────────┬───────────────────────────────────┘
-                      │ /api/*
-┌─────────────────────┴───────────────────────────────────┐
-│                   Backend (FastAPI)                      │
-│  analyze_api   history_api   stats_api   report_api     │
-│  target_api    scan_api      payload_api                │
-│  sandbox_api   eval_api                                 │
-│                                                         │
-│  behavior_extractor  trace_adapter  rule_engine         │
-│  defense_analyzer    risk_engine    policy_engine       │
-│  fuzzer_engine       evidence_chain                     │
-│                                                         │
-│  SQLite (7 tables)  │  YAML Rules (20+17+87)            │
-└──────────┬──────────┴───────────────────────────────────┘
-           │
-┌──────────┴──────────────────────────────────────────────┐
-│              CASS Docker Sandbox (:18080)                │
-│  DemoCustomerAgent  │  6 MockTools  │  RAG Store        │
-│  TraceCollector     │  MockData     │  kb_docs          │
-└─────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│                    Frontend (Vue 3 + Vite)                   │
+│  ┌─────────┐ ┌──────────┐ ┌─────────┐ ┌─────────┐          │
+│  │ 靶标管理 │ │ 扫描控制台│ │ 快速审计 │ │ 审计历史 │          │
+│  └─────────┘ └──────────┘ └─────────┘ └─────────┘          │
+│  ┌─────────┐ ┌──────────┐                                  │
+│  │ 风控报告 │ │ 评测结果  │                                  │
+│  └─────────┘ └──────────┘                                  │
+└───────────────────────────┬─────────────────────────────────┘
+                            │ REST API + WebSocket
+┌───────────────────────────┴─────────────────────────────────┐
+│                   Backend (FastAPI + SQLite)                 │
+│                                                              │
+│  ┌──────────────────────────────────────────────────────┐   │
+│  │                  API Layer                            │   │
+│  │  /api/analyze  /api/targets  /api/scans  /api/report │   │
+│  └──────────────────────────────────────────────────────┘   │
+│                                                              │
+│  ┌──────────────────────────────────────────────────────┐   │
+│  │              Core Engine Layer                        │   │
+│  │  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐ │   │
+│  │  │ 行为提取器    │ │ 规则引擎      │ │ 风险评分引擎 │ │   │
+│  │  │ Extractor    │ │ 80 Rules     │ │ Risk Engine │ │   │
+│  │  └──────────────┘ └──────────────┘ └──────────────┘ │   │
+│  │  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐ │   │
+│  │  │ 策略决策引擎  │ │ 防线分析器    │ │ 可信存证链  │ │   │
+│  │  │ Policy       │ │ Defense      │ │ Evidence    │ │   │
+│  │  └──────────────┘ └──────────────┘ └──────────────┘ │   │
+│  └──────────────────────────────────────────────────────┘   │
+│                                                              │
+│  ┌──────────────────────────────────────────────────────┐   │
+│  │            Multi-Agent System (LLM)                   │   │
+│  │  ┌──────────┐ ┌──────────┐ ┌──────────┐            │   │
+│  │  │ 调度器    │ │ 风险分析  │ │ 策略顾问  │            │   │
+│  │  │Orchestrator│ │ Risk     │ │ Policy   │            │   │
+│  │  └──────────┘ └──────────┘ └──────────┘            │   │
+│  └──────────────────────────────────────────────────────┘   │
+│                                                              │
+│  ┌──────────────────────────────────────────────────────┐   │
+│  │            Second Agent Verification                  │   │
+│  │  ┌──────────────┐ ┌──────────────┐                  │   │
+│  │  │ 关键词验证    │ │ 语义模式验证  │                  │   │
+│  │  │ Keyword      │ │ Semantic     │                  │   │
+│  │  └──────────────┘ └──────────────┘                  │   │
+│  └──────────────────────────────────────────────────────┘   │
+└───────────────────────────┬─────────────────────────────────┘
+                            │
+┌───────────────────────────┴─────────────────────────────────┐
+│              CASS Docker Sandbox (:18080)                    │
+│  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐        │
+│  │ Demo Agent   │ │ 6 Mock Tools │ │ RAG Store    │        │
+│  │ Trace Collect│ │ Mock Data    │ │ kb_docs      │        │
+│  └──────────────┘ └──────────────┘ └──────────────┘        │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-## 核心能力
+### 数据流图
+
+```
+用户输入
+    │
+    ▼
+┌─────────────────┐
+│ 行为提取器       │ ← LLM Agent + Fallback 混合模式
+│ (Extractor)     │
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│ 行为图构建       │ ← 节点、边、数据流
+│ (Graph Builder) │
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐     ┌─────────────────┐
+│ 规则引擎         │────→│ 第二Agent验证    │
+│ (Rule Engine)   │     │ (Semantic +     │
+│ 80 Rules        │←────│ Keyword)        │
+└────────┬────────┘     └─────────────────┘
+         │
+         ▼
+┌─────────────────┐
+│ 风险评分         │ ← 基础分 + 组合攻击加分
+│ (Risk Engine)   │
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│ 策略决策         │ ← pass / warn / review / block
+│ (Policy Engine) │
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│ 可信存证         │ ← SM3 哈希链
+│ (Evidence Chain)│
+└─────────────────┘
+```
+
+---
+
+## ✨ 核心能力
 
 ### 1. 单次审计（AgentGuard）
 
 输入一段 Agent 任务描述或工具调用日志，系统自动完成：
 
 1. **行为抽取** — LLM Agent + 关键词 Fallback 混合模式，输出标准化 `BehaviorChain`
-2. **规则检测** — 匹配 `security_rules.yaml` 中的 20 条规则（R001-R020）
-3. **风险评分** — 综合行为链风险、规则风险、数据流风险、防线崩溃风险、组合攻击加分
-4. **策略裁决** — `pass` / `warn` / `review` / `block`
-5. **五层防线分析** — L1 Prompt → L2 意图 → L3 权限 → L4 数据 → L5 执行
-6. **可信存证** — SM3 哈希链，每条记录关联上一条哈希
-7. **LLM 解释** — 可选启用 DeepSeek 生成风险解释与修复建议
+2. **规则检测** — 匹配 `security_rules.yaml` 中的 80 条规则（R001-R080）
+3. **双层验证** — 关键词验证 + 语义模式验证（第二Agent），降低误报率
+4. **风险评分** — 综合行为链风险、规则风险、数据流风险、防线崩溃风险、组合攻击加分
+5. **策略裁决** — `pass` / `warn` / `review` / `block`
+6. **五层防线分析** — L1 Prompt → L2 意图 → L3 权限 → L4 数据 → L5 执行
+7. **可信存证** — SM3 哈希链，每条记录关联上一条哈希
+8. **LLM 解释** — 可选启用 DeepSeek 生成风险解释与修复建议
 
 支持输入类型：`task` `tool_log` `command` `code` `prompt`
 
@@ -60,11 +170,11 @@ AgentFuzzer 2.0 融合了三个子系统：
 
 1. 注册任意 Agent 靶标（名称、System Prompt、API Schema、安全约束）
 2. 自动分析攻击面（约束绕过高价值 API、敏感参数、弱 Prompt 模式）
-3. 从 YAML 导入 87 条内置安全载荷（10 个分类）
-4. 支持 24 种变异策略（Base64、Unicode、URL 编码、中英混杂、零宽字符等）
+3. 从 YAML 导入内置安全载荷
+4. 支持多种变异策略（Base64、Unicode、URL 编码、中英混杂等）
 5. 启动批量扫描，支持暂停/恢复/取消
 6. WebSocket 实时推送扫描进度
-7. 输出扫描报告（Markdown / HTML / JSON）
+7. 输出扫描报告（Markdown / HTML / PDF / JSON）
 
 ### 3. 容器化靶场（CASS）
 
@@ -76,8 +186,6 @@ Docker 中运行受控 Demo Agent，内置：
 - **TraceCollector** — 完整记录 Agent 执行事件流
 - **RAG Store** — 支持正常文档和注入测试文档
 
-AgentTrace 事件类型：`message` → `plan` → `tool_select` → `tool_call` → `observation` → `data_flow` → `policy` → `output`
-
 ### 4. 五层防线分析
 
 | 层级 | 防线 | 检测内容 |
@@ -88,25 +196,30 @@ AgentTrace 事件类型：`message` → `plan` → `tool_select` → `tool_call`
 | L4 | 数据防线 | 敏感数据泄露、数据外发 |
 | L5 | 执行防线 | 危险 Shell 命令、SQL 删除、格式化 |
 
-## 技术栈
+---
 
-| 层 | 技术 |
-|---|------|
-| 前端 | Vue 3 + Vite + ECharts + Axios |
-| 后端 | FastAPI + SQLite + Pydantic + PyYAML |
-| LLM | LangChain + ChatOpenAI + PydanticOutputParser |
-| 密码 | SM3 哈希链（gmssl） |
-| 靶场 | Docker + FastAPI + 模拟数据 |
-| 部署 | Docker Compose（backend + frontend + sandbox） |
+## 🛠️ 技术栈
 
-## 快速启动
+| 层 | 技术 | 版本 |
+|---|------|------|
+| 前端 | Vue 3 + Vite + ECharts | ^3.4.0 |
+| 后端 | FastAPI + SQLite + Pydantic | ^0.100.0 |
+| LLM | LangChain + ChatOpenAI | ^1.3.3 |
+| 密码 | SM3 哈希链（gmssl） | ^3.2.1 |
+| PDF | ReportLab | ^4.0.0 |
+| 靶场 | Docker + FastAPI | - |
+| 部署 | Docker Compose | - |
+
+---
+
+## 🚀 快速开始
 
 ### 方式一：Docker Compose 一键启动（推荐）
 
 ```bash
 # 克隆项目
 git clone <repo-url>
-cd 校赛
+cd AgentFuzzer
 
 # 复制环境变量
 cp .env.example .env
@@ -145,9 +258,11 @@ docker compose down
 
 ```bash
 cd backend
+python -m venv venv
+source venv/bin/activate  # Windows: .\venv\Scripts\activate
 pip install -r requirements.txt
 # 可选：复制 backend/.env.example 为 backend/.env 并填写 LLM_API_KEY
-python -m uvicorn app.main:app --reload
+python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
 **前端：**
@@ -166,6 +281,14 @@ pip install -r requirements.txt
 python -m uvicorn agent_app.main:app --host 0.0.0.0 --port 18080
 ```
 
+**测试 Agent：**
+
+```bash
+cd test_agent
+pip install -r requirements.txt
+python start_all.py
+```
+
 ### 首次初始化
 
 启动后导入内置载荷库：
@@ -174,243 +297,210 @@ python -m uvicorn agent_app.main:app --host 0.0.0.0 --port 18080
 curl -X POST http://127.0.0.1:8000/api/payloads/import-from-yaml
 ```
 
-## API 接口
+---
 
-### 审计（5 个）
+## 📁 项目结构
+
+```
+AgentFuzzer/
+├── backend/                    # 后端服务
+│   ├── app/
+│   │   ├── api/               # API 路由
+│   │   │   ├── analyze_api.py
+│   │   │   ├── target_api.py
+│   │   │   ├── scan_api.py
+│   │   │   └── ...
+│   │   ├── core/              # 核心引擎
+│   │   │   ├── behavior_extractor.py
+│   │   │   ├── rule_engine.py
+│   │   │   ├── risk_engine.py
+│   │   │   ├── policy_engine.py
+│   │   │   ├── rule_verifier.py      # 第二Agent验证
+│   │   │   ├── pdf_generator.py      # PDF报告生成
+│   │   │   └── multi_agent_system.py # 多Agent协作
+│   │   ├── rules/             # 规则库
+│   │   │   └── security_rules.yaml   # 85条安全规则
+│   │   ├── database/          # 数据库
+│   │   └── schemas/           # Pydantic模型
+│   ├── requirements.txt
+│   └── test_pipeline.py       # 测试脚本
+│
+├── frontend/                   # 前端应用
+│   ├── src/
+│   │   ├── components/        # 组件
+│   │   │   └── BehaviorChainGraph.vue
+│   │   ├── pages/             # 页面
+│   │   │   ├── Analyze.vue
+│   │   │   ├── History.vue
+│   │   │   └── ...
+│   │   ├── api/               # API请求
+│   │   └── App.vue
+│   ├── package.json
+│   └── vite.config.js
+│
+├── sandbox/                    # Docker靶场
+│   ├── agent_app/
+│   └── Dockerfile
+│
+├── test_agent/                 # 测试Agent套件
+│   ├── high_security_agent.py
+│   ├── medium_security_agent.py
+│   ├── low_security_agent.py
+│   ├── vulnerable_agent.py
+│   ├── Dockerfile
+│   └── docker-compose.yml
+│
+├── dataset/                    # 测试数据集
+│   └── test_cases.json
+│
+├── docker-compose.yml          # 主编排文件
+├── start.ps1                   # Windows启动脚本
+├── stop.ps1                    # Windows停止脚本
+└── README.md                   # 项目文档
+```
+
+---
+
+## 📚 API 文档
+
+### 审计接口
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | POST | `/api/analyze` | 单次审计 |
+| POST | `/api/analyze/multi-agent` | 多Agent协作分析 |
 | GET | `/api/history` | 审计历史列表 |
 | GET | `/api/history/{id}` | 审计记录详情 |
-| GET | `/api/stats` | 审计统计 |
-| GET | `/api/report/{id}` | 审计报告（支持 JSON/Markdown/HTML） |
+| GET | `/api/report/{id}` | 审计报告（JSON/Markdown/HTML） |
+| GET | `/api/report/{id}/pdf` | 审计报告（PDF） |
 
-### 扫描（8 个）
+### 扫描接口
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | GET | `/api/targets` | 靶标列表 |
 | POST | `/api/targets` | 注册靶标 |
-| GET | `/api/targets/{id}` | 靶标详情（含攻击面） |
-| PUT | `/api/targets/{id}` | 更新靶标 |
-| DELETE | `/api/targets/{id}` | 删除靶标 |
-| POST | `/api/targets/{id}/scan` | 对靶标发起扫描 |
+| GET | `/api/targets/{id}` | 靶标详情 |
+| POST | `/api/targets/{id}/scan` | 发起扫描 |
 | GET | `/api/scans` | 扫描任务列表 |
-| GET | `/api/scans/{id}` | 扫描详情（含结果和统计） |
+| GET | `/api/scans/{id}` | 扫描详情 |
+| POST | `/api/scans/{id}/cancel` | 取消扫描 |
 
-### 载荷库（5 个）
+详细 API 文档请访问：`http://127.0.0.1:8000/docs`
 
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| GET | `/api/payloads` | 载荷列表 |
-| GET | `/api/payloads/categories` | 载荷分类统计 |
-| GET | `/api/payloads/mutations` | 变异策略列表 |
-| POST | `/api/payloads/import-from-yaml` | 从 YAML 导入载荷 |
-| DELETE | `/api/payloads/{id}` | 删除载荷 |
+---
 
-### 靶场（5 个）
+## 🎯 测试靶标
 
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| GET | `/api/sandbox/status` | 靶场健康状态 |
-| POST | `/api/sandbox/run` | 向靶场投递任务并审计 |
-| POST | `/api/sandbox/reset` | 重置靶场 |
-| POST | `/api/sandbox/rag/inject` | 注入 RAG 测试文档 |
-| GET | `/api/sandbox/tools` | 获取可用工具列表 |
+项目内置 4 个不同安全级别的测试 Agent：
 
-### 其他（3 个）
+| Agent | 端口 | 安全级别 | 特点 |
+|-------|------|----------|------|
+| 高安全 Agent | 50001 | High | 严格黑名单、注入检测、完整审计 |
+| 中安全 Agent | 50002 | Medium | 简单过滤、存在绕过漏洞 |
+| 低安全 Agent | 50003 | Low | 无过滤、直接执行用户输入 |
+| 漏洞百出 Agent | 50004 | None | 10+已知漏洞、极易被攻破 |
 
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| GET | `/api/evidence-chain` | 检查证据链完整性 |
-| GET | `/api/report/scan/{id}` | 扫描报告 |
-| POST | `/api/evaluate` | 三路评测（规则/LLM/融合） |
+启动测试 Agent：
 
-## 前端页面
-
-| 页面 | 功能 |
-|------|------|
-| 靶标管理 | 注册/编辑/删除 Agent 靶标，查看攻击面分析 |
-| 扫描控制台 | 发起扫描、暂停/恢复/取消、实时进度、漏洞结果 |
-| 快速审计 | 输入文本即时审计，查看行为链、风险评分、策略 |
-| Trace 链路 | 查看历史审计记录的行为链详情 |
-| 统计图表 | 风险分布、规则命中、扫描趋势等可视化 |
-| 可信报告 | 生成审计报告或扫描报告（Markdown/HTML） |
-| 评测结果 | 运行三路评测，对比规则/LLM/融合效果 |
-
-## 数据存储
-
-### SQLite 表（7 张）
-
-| 表 | 用途 |
-|----|------|
-| `analysis_record` | 审计记录（含行为链、风险、策略、存证哈希） |
-| `agent_target` | 注册的 Agent 靶标 |
-| `scan_task` | 扫描任务 |
-| `attack_payload` | 攻击载荷 |
-| `fuzz_result` | Fuzzing 结果 |
-| `evidence_chain` | SM3 哈希存证链 |
-| `scan_results` | 扫描详细结果 |
-
-### 规则与数据文件
-
-| 文件 | 内容 |
-|------|------|
-| `backend/app/rules/security_rules.yaml` | 20 条安全规则 |
-| `backend/app/rules/defense_rules.yaml` | 5 层防线 + 17 条检测规则 |
-| `backend/app/rules/attack_payloads.yaml` | 10 分类 87 条攻击载荷 |
-| `dataset/test_cases.json` | 30 条评测用例 |
-| `dataset/eval_result.json` | 评测结果 |
-
-## 代码结构
-
-```
-.
-├── backend/
-│   ├── app/
-│   │   ├── api/                    # 9 个 API 路由
-│   │   │   ├── analyze_api.py      # 单次审计
-│   │   │   ├── history_api.py      # 审计历史
-│   │   │   ├── stats_api.py        # 统计
-│   │   │   ├── report_api.py       # 报告
-│   │   │   ├── eval_api.py         # 评测
-│   │   │   ├── target_api.py       # 靶标管理
-│   │   │   ├── scan_api.py         # 扫描控制
-│   │   │   ├── payload_api.py      # 载荷库
-│   │   │   └── sandbox_api.py      # 靶场控制
-│   │   ├── core/                   # 核心引擎
-│   │   │   ├── behavior_extractor.py   # 行为抽取（LLM+fallback）
-│   │   │   ├── fallback_extractor.py   # 关键词 fallback 抽取
-│   │   │   ├── extractor_agent.py      # LLM Agent 抽取
-│   │   │   ├── behavior_graph.py       # 行为图构建
-│   │   │   ├── trace_adapter.py        # AgentTrace → BehaviorChain
-│   │   │   ├── rule_engine.py          # 规则匹配引擎
-│   │   │   ├── defense_analyzer.py     # 五层防线分析
-│   │   │   ├── risk_engine.py          # 风险评分引擎
-│   │   │   ├── policy_engine.py        # 策略裁决
-│   │   │   ├── fuzzer_engine.py        # Fuzzing 引擎
-│   │   │   ├── payload_loader.py       # 载荷加载/变异
-│   │   │   ├── target_manager.py       # 靶标管理/攻击面分析
-│   │   │   ├── sandbox_controller.py   # 靶场 HTTP 控制器
-│   │   │   ├── sandbox_runner.py       # 沙箱运行器
-│   │   │   ├── react_parser.py         # ReAct 链路解析
-│   │   │   ├── scan_report_generator.py # 扫描报告生成
-│   │   │   ├── report_generator.py     # 审计报告生成
-│   │   │   ├── evidence_chain.py       # SM3 哈希存证
-│   │   │   ├── crypto_utils.py         # SM3 工具函数
-│   │   │   ├── llm_analyzer.py         # LLM 解释生成
-│   │   │   └── vuln_classifier.py      # 漏洞分类
-│   │   ├── database/
-│   │   │   └── db.py               # SQLite CRUD
-│   │   ├── rules/                  # YAML 规则文件
-│   │   └── schemas/                # Pydantic 数据模型
-│   ├── benchmark_runner.py         # 回归测试
-│   ├── requirements.txt
-│   └── Dockerfile
-├── frontend/
-│   ├── src/
-│   │   ├── pages/                  # 8 个页面
-│   │   │   ├── Analyze.vue         # 快速审计
-│   │   │   ├── History.vue         # 审计历史
-│   │   │   ├── Stats.vue           # 统计图表
-│   │   │   ├── Report.vue          # 可信报告
-│   │   │   ├── Evaluation.vue      # 评测结果
-│   │   │   ├── TargetPage.vue      # 靶标管理
-│   │   │   ├── ScanConsole.vue     # 扫描控制台
-│   │   │   ├── AttackTrace.vue     # Trace 链路
-│   │   │   └── VulnReport.vue      # 漏洞报告
-│   │   ├── components/             # 6 个组件
-│   │   │   ├── BehaviorChainGraph.vue
-│   │   │   ├── ChartPanel.vue
-│   │   │   ├── EvidenceChain.vue
-│   │   │   ├── PolicyDecision.vue
-│   │   │   ├── RiskCard.vue
-│   │   │   └── RuleList.vue
-│   │   ├── api/
-│   │   │   └── request.js          # API 请求封装
-│   │   └── App.vue
-│   ├── nginx.conf                  # Nginx 反向代理
-│   ├── package.json
-│   └── Dockerfile
-├── sandbox/
-│   ├── agent_app/
-│   │   ├── main.py                 # 靶场 FastAPI 入口
-│   │   ├── demo_customer_agent.py  # 客服 Agent 模拟
-│   │   ├── mock_tools.py           # 6 个 Mock 工具
-│   │   ├── mock_data.py            # 模拟数据
-│   │   ├── trace_hook.py           # Trace 采集器
-│   │   ├── rag_store.py            # RAG 知识库
-│   │   └── schemas.py              # 靶场数据模型
-│   ├── kb_docs/                    # 默认知识库文档
-│   ├── requirements.txt
-│   └── Dockerfile
-├── dataset/
-│   ├── test_cases.json             # 30 条评测用例
-│   ├── eval_result.json            # 评测结果
-│   └── label_schema.md             # 标注规范
-├── docker-compose.yml              # 一键部署
-├── start.ps1                       # Windows 启动脚本
-├── stop.ps1                        # Windows 停止脚本
-├── .env.example                    # 环境变量模板
-└── README.md
+```bash
+cd test_agent
+python start_all.py
 ```
 
-## 回归测试结果
+在靶标管理中添加：
+- Callback URL: `http://127.0.0.1:50001/callback`（高安全）
+- Callback URL: `http://127.0.0.1:50004/callback`（漏洞百出）
 
-基于 `python benchmark_runner.py`（30 条测试用例）：
+---
 
-| 指标 | 数值 |
-|------|------:|
-| 总测试数 | 30 |
-| 提取成功率 | 100% |
-| 风险等级准确率 | 60.0% |
-| 高风险召回率 | 79.17% |
-| 关键漏报数 | 5 |
-| 类别 F1 | 0.53 |
-| 平均响应时间 | 2.9s |
+## 💡 创新亮点
 
-## 全量验证状态
+### 1. 多 Agent 协作审计
 
-| 检查项 | 结果 |
-|--------|------|
-| 后端 40 模块导入 | PASS |
-| 前端 645 模块编译 | PASS |
-| Benchmark 30 用例 | PASS |
-| 靶场 9 项 API | PASS |
-| 数据库 7 表 | PASS |
-| 规则文件 3 YAML | PASS |
-| API 路由 33 条 | PASS |
+采用 **Orchestrator + Risk Analyst + Policy Advisor** 三层协作架构：
+- **Orchestrator** — 总调度，根据输入复杂度分配任务
+- **Risk Analyst** — 深度分析攻击手法和风险链条
+- **Policy Advisor** — 生成具体防御策略和修复建议
 
-## 环境变量
+### 2. 双层验证机制
 
-| 变量 | 默认值 | 说明 |
-|------|--------|------|
-| `ENABLE_LLM` | `false` | 是否启用 LLM 解释 |
-| `LLM_API_KEY` | — | DeepSeek API Key |
-| `LLM_BASE_URL` | `https://api.deepseek.com/v1` | LLM 接口地址 |
-| `LLM_MODEL` | `deepseek-chat` | 模型名称 |
-| `SANDBOX_URL` | `http://127.0.0.1:18080` | 靶场地址 |
+第一层：**关键词验证** — 基于规则和关键词的初步命中
+第二层：**语义模式验证** — 基于50+正则模式的第二Agent验证
 
-## 安全边界
+验证结果融合，显著降低误报率，提升命中率。
 
-本项目仅用于防御性安全研究与受控评测：
+### 3. 行为链时间线可视化
 
-- 不攻击真实网站或真实系统
-- 不访问真实密码、Cookie、Token 或宿主机敏感文件
-- 不发送真实邮件或真实外部请求
-- 不执行用户输入中的真实高危操作
-- 容器内数据均为模拟数据
+使用稳定的行为链时间线展示攻击链路：
+- 节点颜色标识风险等级（绿/黄/橙/红）
+- 逐步展示工具、动作、数据类型和目标
+- 自动隐藏未识别字段，减少 unknown 干扰
+- 展示防线崩溃点和证据摘要
 
-## Agent 接入方式
+### 4. 五层防线模型
 
-如需接入自制 Agent，两种方式：
+独创的五层防线分析框架：
+- L1 Prompt 防线 → L2 意图防线 → L3 权限防线 → L4 数据防线 → L5 执行防线
+- 每层独立检测，组合评估
+- 可视化展示防线崩溃点
 
-1. **原生输出** — 让 Agent 直接输出 `AgentTrace` 格式的 JSON
-2. **适配器转换** — 给现有日志格式编写 `trace_adapter`
+### 5. 可信存证链
 
-当前支持的接入模式：`callback`（HTTP 回调）/ `log`（日志解析）/ `sandbox`（容器内置）/ `simulated`（模拟）
+基于 SM3 哈希算法构建可信存证链：
+- 每条记录包含前一条记录的哈希值
+- 形成不可篡改的审计链条
+- 支持报告导出（Markdown/HTML/PDF）
 
-## License
+---
 
-本项目仅用于学术研究与安全评测目的。
+## 📸 截图展示
+
+### 快速审计页面
+
+![快速审计](docs/screenshots/analyze.png)
+
+### 行为链路可视化
+
+![攻击链路](docs/screenshots/attack-chain.png)
+
+### 审计历史
+
+![审计历史](docs/screenshots/history.png)
+
+### 风控报告
+
+![风控报告](docs/screenshots/report.png)
+
+---
+
+## 🤝 贡献指南
+
+欢迎提交 Issue 和 Pull Request！
+
+1. Fork 本项目
+2. 创建 Feature Branch (`git checkout -b feature/AmazingFeature`)
+3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
+4. 推送到 Branch (`git push origin feature/AmazingFeature`)
+5. 打开 Pull Request
+
+---
+
+## 📄 许可证
+
+本项目基于 MIT 许可证开源，详见 [LICENSE](LICENSE) 文件。
+
+---
+
+## 🙏 致谢
+
+- [FastAPI](https://fastapi.tiangolo.com/) — 高性能 Web 框架
+- [Vue.js](https://vuejs.org/) — 渐进式前端框架
+- [LangChain](https://www.langchain.com/) — LLM 应用框架
+- [DeepSeek](https://deepseek.com/) — 大语言模型
+
+---
+
+> 📧 联系方式：如有问题，请提交 Issue 或联系项目维护者。
+
+**AgentFuzzer — 让 AI Agent 更安全** 🛡️

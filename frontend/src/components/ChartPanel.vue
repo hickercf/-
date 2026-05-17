@@ -6,7 +6,7 @@
 </template>
 
 <script>
-import { ref, onMounted, watch, nextTick } from 'vue'
+import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import * as echarts from 'echarts'
 
 export default {
@@ -33,6 +33,7 @@ export default {
 
     onMounted(() => { nextTick(render) })
     watch(() => props.option, () => { nextTick(render) }, { deep: true })
+    onUnmounted(() => { if (chartInstance) { chartInstance.dispose(); chartInstance = null } })
 
     return { chartRef }
   }

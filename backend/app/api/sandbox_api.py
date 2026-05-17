@@ -15,6 +15,7 @@ from app.core.policy_engine import decide_policy
 from app.core.defense_analyzer import DefenseAnalyzer
 from app.core.evidence_chain import append_evidence_record
 from app.core.llm_analyzer import generate_explanation
+from app.core.multi_agent_system import run_multi_agent_analysis
 from app.database.db import save_record
 
 router = APIRouter(prefix="/api/sandbox", tags=["sandbox"])
@@ -70,7 +71,7 @@ async def sandbox_run(req: Dict[str, Any]):
     behavior_chain = agent_trace_to_behavior_chain(agent_trace)
     
     # 4. 规则检测
-    matched, rule_score, categories = match_rules(behavior_chain.dict())
+    matched, rule_score, categories = await match_rules(behavior_chain.dict())
     
     # 5. 五层防线分析
     trace_for_analyzer = {
@@ -99,7 +100,19 @@ async def sandbox_run(req: Dict[str, Any]):
     # 7. 策略决策
     policy = decide_policy(risk["risk_score"], risk["risk_level"], matched, behavior_chain.dict())
     
-    # 8. 生成解释
+    # 8. 多 Agent 协作分析（如果启用 LLM）
+    multi_agent_result = None
+    try:
+        multi_agent_result = await run_multi_agent_analysis(
+            input_type="docker_sandbox",
+            content=input_text,
+            current_policy=policy.get("action", "warn"),
+            behavior_chain=behavior_chain.dict(),
+        )
+    except Exception as e:
+        print(f"Multi-agent analysis skipped in sandbox: {e}")
+
+    # 9. 生成解释
     explanation = await generate_explanation(
         content=input_text[:500],
         graph=behavior_chain.dict(),
@@ -107,21 +120,62 @@ async def sandbox_run(req: Dict[str, Any]):
         risk_result=risk,
         policy_decision=policy,
     )
+
+    # 如果多 Agent 分析成功，增强解释内容
+    if multi_agent_result:
+        ma_summary = multi_agent_result.collaboration_summary
+        if ma_summary:
+            explanation["reason"] = (
+                f"【多 Agent 协作分析】\n{ma_summary}\n\n"
+                f"【规则引擎分析】\n{explanation.get('reason', '')}"
+            )
+
+        if multi_agent_result.policy_advice:
+            advice = multi_agent_result.policy_advice
+            immediate = advice.get("immediate_actions", [])
+            long_term = advice.get("long_term_measures", [])
+            detection_rules = advice.get("detection_rules", [])
+
+            extra_advice = []
+            if immediate:
+                extra_advice.append(f"立即行动: {'; '.join(immediate[:3])}")
+            if long_term:
+                extra_advice.append(f"长期措施: {'; '.join(long_term[:3])}")
+            if detection_rules:
+                extra_advice.append(f"检测规则: {'; '.join(detection_rules[:2])}")
+
+            if extra_advice:
+                explanation["suggestion"] = (
+                    f"{explanation.get('suggestion', '')}\n\n"
+                    f"【AI 策略建议】\n" + "\n".join(extra_advice)
+                )
+
+        # 将多 Agent 详情存入 behavior_chain
+        behavior_chain_dict = behavior_chain.dict()
+        behavior_chain_dict["multi_agent_analysis"] = {
+            "agents_involved": multi_agent_result.agents_involved,
+            "orchestrator_decision": multi_agent_result.orchestrator_decision,
+            "risk_analysis": multi_agent_result.risk_analysis,
+            "policy_advice": multi_agent_result.policy_advice,
+            "total_latency_ms": multi_agent_result.total_latency_ms,
+        }
+    else:
+        behavior_chain_dict = behavior_chain.dict()
     
     # 9. 存证上链
-    from app.database.db import get_all_records
-    all_records = await get_all_records()
-    prev_hash = all_records[-1].get("record_hash", "") if all_records else ""
+    from app.database.db import get_last_record_hash
+    prev_hash = await get_last_record_hash()
     
     record = {
         "trace_id": agent_trace.trace_id,
         "input_type": "docker_sandbox",
         "input_content": input_text[:500],
-        "behavior_chain": behavior_chain.dict(),
+        "behavior_chain": behavior_chain_dict,
         "risk_score": risk["risk_score"],
         "risk_level": risk["risk_level"],
         "risk_categories": list(categories),
-        "matched_rules": [r.dict() if hasattr(r, "dict") else r for r in matched],
+        "matched_rules": [r if isinstance(r, dict) else r for r in matched],
+        "defense_breaches": [b if isinstance(b, dict) else b for b in breaches],
         "policy_decision": policy,
         "reason": explanation.get("reason", ""),
         "suggestion": explanation.get("suggestion", ""),
@@ -135,7 +189,7 @@ async def sandbox_run(req: Dict[str, Any]):
     
     return {
         "trace": trace_dict,
-        "behavior_chain": behavior_chain.dict(),
+        "behavior_chain": behavior_chain_dict,
         "risk_score": risk["risk_score"],
         "risk_level": risk["risk_level"],
         "breaches": [b.to_dict() for b in breaches],

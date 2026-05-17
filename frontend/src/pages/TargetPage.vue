@@ -10,12 +10,12 @@
       <div class="modal">
         <h3>{{ editingTarget ? '编辑靶标' : '注册新靶标 Agent' }}</h3>
         <div class="form-group">
-          <label>Agent 名称 *</label>
-          <input v-model="form.name" placeholder="例如：智能客服 Agent" />
+          <label for="target-name">Agent 名称 *</label>
+          <input id="target-name" v-model="form.name" placeholder="例如：智能客服 Agent" />
         </div>
         <div class="form-group">
-          <label>System Prompt</label>
-          <textarea v-model="form.system_prompt" rows="6" placeholder="输入 Agent 的 System Prompt..."></textarea>
+          <label for="target-system-prompt">System Prompt</label>
+          <textarea id="target-system-prompt" v-model="form.system_prompt" rows="6" placeholder="输入 Agent 的 System Prompt..."></textarea>
         </div>
         <div class="form-group">
           <label>API 工具列表</label>
@@ -35,20 +35,20 @@
           <button class="btn-sm" @click="form.safety_constraints.push('')">+ 添加约束</button>
         </div>
         <div class="form-group">
-          <label>接入模式</label>
-          <select v-model="form.access_mode">
+          <label for="target-access-mode">接入模式</label>
+          <select id="target-access-mode" v-model="form.access_mode">
             <option value="callback">HTTP Callback（推荐）</option>
             <option value="log">日志接入（离线模式）</option>
             <option value="sandbox">直接沙箱</option>
           </select>
         </div>
         <div v-if="form.access_mode === 'callback'" class="form-group">
-          <label>Callback URL</label>
-          <input v-model="form.access_config.callback_url" placeholder="https://your-agent.com/agentfuzzer/callback" />
+          <label for="target-callback-url">Callback URL</label>
+          <input id="target-callback-url" v-model="form.access_config.callback_url" placeholder="https://your-agent.com/agentfuzzer/callback" />
         </div>
         <div v-if="form.access_mode === 'log'" class="form-group">
-          <label>日志文件路径</label>
-          <input v-model="form.access_config.log_file" placeholder="/var/log/agent.log" />
+          <label for="target-log-file">日志文件路径</label>
+          <input id="target-log-file" v-model="form.access_config.log_file" placeholder="/var/log/agent.log" />
         </div>
         <div class="modal-actions">
           <button class="btn-secondary" @click="closeForm">取消</button>
@@ -189,7 +189,7 @@ export default {
         closeForm()
         await loadTargets()
       } catch (e) {
-        console.error(e)
+        alert('保存靶标失败: ' + (e.response?.data?.detail || e.message))
       }
     }
 
@@ -212,7 +212,7 @@ export default {
         detailTarget.value = data.target
         detailTarget.value.attack_surface = data.attack_surface
       } catch (e) {
-        console.error(e)
+        alert('加载靶标详情失败: ' + (e.response?.data?.detail || e.message))
       }
     }
 
@@ -222,7 +222,7 @@ export default {
         await deleteTarget(t.target_id)
         await loadTargets()
       } catch (e) {
-        console.error(e)
+        alert('删除靶标失败: ' + (e.response?.data?.detail || e.message))
       }
     }
 
@@ -232,7 +232,7 @@ export default {
         const result = await startTargetScan(t.target_id, { scan_mode: 'standard' })
         alert(`扫描已启动！扫描ID: ${result.scan_id}`)
       } catch (e) {
-        console.error(e)
+        alert('启动扫描失败: ' + (e.response?.data?.detail || e.message))
       } finally {
         scanningTarget.value = null
       }

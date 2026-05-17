@@ -18,9 +18,8 @@
       <TargetPage v-if="activeTab === 'targets'" />
       <ScanConsolePage v-if="activeTab === 'scan'" />
       <AnalyzePage v-if="activeTab === 'analyze'" />
-      <AttackTracePage v-if="activeTab === 'trace'" />
-      <StatsPage v-if="activeTab === 'stats'" />
-      <ReportPage v-if="activeTab === 'report'" />
+      <HistoryPage v-if="activeTab === 'history'" />
+      <VulnReportPage v-if="activeTab === 'vuln-report'" />
       <EvalPage v-if="activeTab === 'eval'" />
     </main>
   </div>
@@ -30,25 +29,22 @@
 import { ref } from 'vue'
 import AnalyzePage from './pages/Analyze.vue'
 import HistoryPage from './pages/History.vue'
-import StatsPage from './pages/Stats.vue'
-import ReportPage from './pages/Report.vue'
 import EvalPage from './pages/Evaluation.vue'
 import TargetPage from './pages/TargetPage.vue'
 import ScanConsolePage from './pages/ScanConsole.vue'
-import AttackTracePage from './pages/AttackTrace.vue'
+import VulnReportPage from './pages/VulnReport.vue'
 
 export default {
   name: 'App',
-  components: { AnalyzePage, HistoryPage, StatsPage, ReportPage, EvalPage, TargetPage, ScanConsolePage, AttackTracePage },
+  components: { AnalyzePage, HistoryPage, EvalPage, TargetPage, ScanConsolePage, VulnReportPage },
   setup() {
     const activeTab = ref('targets')
     const tabs = [
       { key: 'targets', label: '靶标管理' },
       { key: 'scan', label: '扫描控制台' },
       { key: 'analyze', label: '快速审计' },
-      { key: 'trace', label: 'Trace 链路' },
-      { key: 'stats', label: '统计图表' },
-      { key: 'report', label: '可信报告' },
+      { key: 'history', label: '审计历史' },
+      { key: 'vuln-report', label: '风控报告' },
       { key: 'eval', label: '评测结果' },
     ]
     return { activeTab, tabs }

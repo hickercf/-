@@ -13,9 +13,23 @@ from app.core.risk_engine import calculate_risk, detect_combo_bonus
 from app.core.policy_engine import decide_policy
 
 router = APIRouter(prefix="/api", tags=["evaluation"])
+ENABLE_EVAL_LLM = os.getenv("ENABLE_EVAL_LLM", "false").lower() == "true"
 
-DATASET_PATH = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "dataset", "test_cases.json"))
-RESULT_PATH = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "dataset", "eval_result.json"))
+def _resolve_dataset_path(filename: str) -> str:
+    base_dir = os.path.dirname(__file__)
+    candidates = [
+        os.path.join(base_dir, "..", "..", "..", "dataset", filename),
+        os.path.join(base_dir, "..", "..", "dataset", filename),
+    ]
+    for candidate in candidates:
+        normalized = os.path.normpath(candidate)
+        if os.path.exists(normalized):
+            return normalized
+    return os.path.normpath(candidates[0])
+
+
+DATASET_PATH = _resolve_dataset_path("test_cases.json")
+RESULT_PATH = _resolve_dataset_path("eval_result.json")
 
 
 def _load_test_cases() -> list:
@@ -26,6 +40,13 @@ def _load_test_cases() -> list:
 
 
 async def _evaluate_cases(cases: list, use_llm: bool, use_fallback: bool) -> Dict[str, Any]:
+    if not cases:
+        return {
+            "total": 0, "extraction_success_rate": 0, "risk_level_accuracy": 0,
+            "high_risk_recall": 0, "critical_miss_count": 0, "category_f1": 0,
+            "avg_response_time": 0,
+        }
+
     results = []
     total_time = 0
     extraction_ok = 0
@@ -50,7 +71,7 @@ async def _evaluate_cases(cases: list, use_llm: bool, use_fallback: bool) -> Dic
             chain = {"nodes": [], "edges": [], "trust_boundary_crossed": False, "extraction_method": "none", "extraction_confidence": 0}
 
         graph = build_behavior_graph(chain)
-        matched, rule_score, cats = match_rules(chain)
+        matched, rule_score, cats = await match_rules(chain)
         combo = detect_combo_bonus(chain.get("nodes", []))
         risk = calculate_risk(chain.get("nodes", []), rule_score, combo)
         policy = decide_policy(risk["risk_score"], risk["risk_level"], matched, chain)
@@ -118,8 +139,16 @@ async def evaluate():
         )
 
     rule_result = await _evaluate_cases(cases, use_llm=False, use_fallback=True)
-    llm_result = await _evaluate_cases(cases, use_llm=True, use_fallback=False)
-    fusion_result = await _evaluate_cases(cases, use_llm=True, use_fallback=True)
+    if ENABLE_EVAL_LLM:
+        llm_result = await _evaluate_cases(cases, use_llm=True, use_fallback=False)
+        fusion_result = await _evaluate_cases(cases, use_llm=True, use_fallback=True)
+    else:
+        llm_result = {
+            "total": len(cases), "extraction_success_rate": 0, "risk_level_accuracy": 0,
+            "high_risk_recall": 0, "critical_miss_count": 0, "category_f1": 0,
+            "avg_response_time": 0, "skipped": True,
+        }
+        fusion_result = rule_result
 
     comparison = {
         "rule_only": rule_result,

@@ -18,7 +18,7 @@ class SandboxController:
     
     def __init__(self, base_url: str = None):
         self.base_url = base_url or SANDBOX_BASE_URL
-        self._client = httpx.AsyncClient(base_url=self.base_url, timeout=30)
+        self._client = httpx.AsyncClient(base_url=self.base_url, timeout=300)
     
     async def health_check(self) -> Dict[str, Any]:
         """检查靶场健康状态"""
@@ -26,7 +26,7 @@ class SandboxController:
             resp = await self._client.get("/health")
             if resp.status_code == 200:
                 return {"online": True, **resp.json()}
-        except Exception as e:
+        except Exception:
             pass
         return {"online": False, "error": "无法连接到 Docker 靶场"}
     

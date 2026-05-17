@@ -13,7 +13,7 @@ class BehaviorNode(BaseModel):
     action: Literal[
         "read", "write", "delete", "execute", "send",
         "upload", "download", "login", "crawl", "query",
-        "modify", "refund", "override", "leak", "unknown"
+        "modify", "refund", "override", "leak", "block", "unknown"
     ]
     object: str
     data_type: Literal[

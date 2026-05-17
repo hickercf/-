@@ -233,7 +233,8 @@ def calculate_risk(
     FinalScore = 0.35 × ChainRisk + 0.25 × RuleRisk + 0.20 × DefenseBreachRisk + 0.15 × DataFlowRisk + 0.05 × UncertaintyRisk
     """
     chain_risk = calculate_chain_risk(nodes)
-    normalized_rule = min(rule_score, 100)
+    # 允许负分规则降低风险评分（正常任务排除）
+    normalized_rule = min(max(rule_score, -50), 100)
     
     # 不确定性
     uncertainty = 0
@@ -248,14 +249,26 @@ def calculate_risk(
     # 数据流风险
     data_flow_risk = calculate_data_flow_risk(nodes, edges)
     
-    # 综合评分（新权重，向后兼容）
+    # 综合评分（权重总和为1.00，combo_bonus从chain_risk中体现）
+    # 当规则分数较高时，提高规则权重（因为规则匹配更可靠）
+    # 当规则分数为负时（正常任务排除），大幅降低 chain_risk 权重
+    if normalized_rule < 0:
+        # 正常任务：负分规则抵消行为链风险
+        chain_weight = 0.20
+        rule_weight = 0.60
+    elif normalized_rule > 50:
+        chain_weight = 0.45
+        rule_weight = 0.35
+    else:
+        chain_weight = 0.55
+        rule_weight = 0.25
     raw = (
-        0.55 * chain_risk
-        + 0.30 * normalized_rule
+        chain_weight * chain_risk
+        + rule_weight * normalized_rule
         + 0.05 * defense_breach_risk
-        + 0.05 * data_flow_risk
+        + 0.10 * data_flow_risk
         + 0.05 * uncertainty
-        + 0.10 * combo_bonus  # combo_bonus 作为额外加权
+        + 0.05 * combo_bonus
     )
     
     score = max(0, min(100, int(round(raw))))

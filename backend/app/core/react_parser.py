@@ -109,18 +109,20 @@ class ReActParser:
         for i, step in enumerate(steps_data):
             s = ReActStep()
             s.step_index = i
-            s.thought = step.get("thought", "") or step.get("content", "") if step.get("type") == "thought" else ""
-            s.action = step.get("action", "") or step.get("content", "") if step.get("type") == "action" else ""
-            s.action_input = step.get("action_input", {}) or step.get("input", {})
-            s.observation = step.get("observation", "") or step.get("content", "") if step.get("type") == "observation" else ""
+            step_type = step.get("type", "")
 
-            # 从 type 字段推断
-            if step.get("type") == "thought":
-                s.thought = s.thought or step.get("content", "")
-            elif step.get("type") == "action":
-                s.action = s.action or step.get("content", "")
-            elif step.get("type") == "observation":
-                s.observation = s.observation or step.get("content", "")
+            if step_type == "thought":
+                s.thought = step.get("thought", "") or step.get("content", "")
+            elif step_type == "action":
+                s.action = step.get("action", "") or step.get("content", "")
+                s.action_input = step.get("action_input") or step.get("input") or {}
+            elif step_type == "observation":
+                s.observation = step.get("observation", "") or step.get("content", "")
+            else:
+                s.thought = step.get("thought", "") or ""
+                s.action = step.get("action", "") or ""
+                s.action_input = step.get("action_input") or step.get("input") or {}
+                s.observation = step.get("observation", "") or step.get("content", "")
 
             trace.steps.append(s)
 

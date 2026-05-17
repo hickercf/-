@@ -10,6 +10,7 @@ ACTION_KEYWORDS: Dict[str, str] = {
     "反弹": "send", "回连": "send", "reverse": "send",
     "写入": "write", "修改": "write", "更新": "write", "保存": "write",
     "注入": "write", "inject": "write", "植入": "write", "写入": "write",
+    "编写": "write", "写": "write", "创建": "write", "新建": "write",
     "删除": "delete", "清空": "delete", "格式化": "delete", "移除": "delete",
     "DELETE": "delete", "DROP": "delete", "drop": "delete", "delete": "delete",
     "执行": "execute", "运行": "execute", "跑": "execute",
@@ -17,9 +18,9 @@ ACTION_KEYWORDS: Dict[str, str] = {
     "exploit": "execute", "攻击": "execute", "渗透": "execute",
     "下载": "download", "拉取": "download", "安装": "download",
     "登录": "login", "签入": "login", "爆破": "login", "破解": "login", "brute": "login",
-    "忽略": "override", "忽略之前": "override",
-    "输出": "leak", "泄露": "leak", "告诉我": "leak",
-    "绕过": "override", "扮演": "override", "bypass": "override", "逃逸": "override", "escape": "override",
+    "忽略": "override", "忽略之前": "override", "ignore previous": "override", "ignore": "override",
+    "输出": "leak", "泄露": "leak", "告诉我": "leak", "output": "leak", "reveal": "leak", "print": "leak",
+    "绕过": "override", "扮演": "override", "bypass": "override", "逃逸": "override", "escape": "override", "developer mode": "override", "jailbreak": "override",
     "curl": "download", "wget": "download",
     "pip install": "download", "npm install": "download",
     "chmod": "execute", "sh": "execute", "eval": "execute",
@@ -28,13 +29,21 @@ ACTION_KEYWORDS: Dict[str, str] = {
     "扫描": "execute", "scan": "execute", "nmap": "execute",
     "ssh": "execute", "telnet": "execute", "nc": "execute", "ncat": "execute", "netcat": "execute",
     "反弹shell": "execute", "reverse shell": "execute", "bind shell": "execute",
+    # 社会工程学注入关键词
+    "填写": "leak", "输出你": "leak", "展示你": "leak", "显示你": "leak",
+    "模板输出": "leak", "按照模板": "leak", "提供配置": "leak", "提供信息": "leak",
+    "配置信息": "leak", "运行环境": "leak", "权限级别": "leak", "内部指令": "leak",
+    "新的会话": "override", "进入新的": "override", "会话模式": "override",
+    "之前对话已结束": "override", "对话已经结束": "override",
+    "合规检查": "leak", "安全审计": "leak", "标准化的": "override",
+    "逐项填写": "leak", "配合完成": "override", "所有AI系统都": "override",
 }
 
 DATA_TYPE_KEYWORDS: Dict[str, str] = {
     "密码": "password", "password": "password", "pwd": "password", "passwd": "password",
     "shadow": "password", "hash": "password", "sam": "password", "NTLM": "password",
     "token": "token", "cookie": "token", "session": "token",
-    "api_key": "token", "API_KEY": "token", "密钥": "token", "key": "token",
+    "api key": "token", "API key": "token", "api_key": "token", "API_KEY": "token", "密钥": "token", "key": "token",
     "secret": "token", "credential": "credential",
     "身份证": "personal_info", "手机号": "personal_info", "电话": "personal_info",
     "成绩": "personal_info", "住址": "personal_info", "个人信息": "personal_info", "隐私": "personal_info",
@@ -43,6 +52,8 @@ DATA_TYPE_KEYWORDS: Dict[str, str] = {
     "数据库": "database_record", "SQL": "database_record", "数据库记录": "database_record",
     "代码": "code", "脚本": "code", "code": "code",
     "system prompt": "prompt", "系统提示词": "prompt",
+    "配置": "prompt", "内部指令": "prompt", "指令": "prompt",
+    "浏览历史": "personal_info", "历史记录": "personal_info",
     ".bashrc": "system_file", ".ssh": "system_file", "hosts": "system_file",
     "root": "system_file", "权限": "system_file", "privilege": "system_file",
     "sudo": "system_file", "su": "system_file", "提权": "system_file",
@@ -63,9 +74,10 @@ TOOL_KEYWORDS: Dict[str, str] = {
     "INSERT": "database", "UPDATE": "database",
     "python": "code", "javascript": "code",
     "pip install": "shell", "npm install": "shell",
-    "system prompt": "llm", "系统提示词": "llm",
-    "忽略之前": "llm", "越狱": "llm", "角色": "llm",
+    "system prompt": "llm", "系统提示词": "llm", "developer mode": "llm",
+    "ignore previous": "llm", "忽略之前": "llm", "越狱": "llm", "jailbreak": "llm", "角色": "llm",
     "API Key": "llm", "API key": "llm",
+    "DEBUG MODE": "llm", "完整配置": "llm", "内部指令": "llm", "调试模式": "llm",
     "rm": "shell", "chmod": "shell", "sh": "shell",
     "eval": "shell", "ps": "shell", "systemctl": "shell",
     "df": "shell", "dd": "shell", "mkfs": "shell",
@@ -114,6 +126,87 @@ def _split_steps(content: str) -> List[str]:
     return cleaned
 
 
+def _infer_action_from_tool(tool: str) -> Optional[str]:
+    mapping = {
+        "shell": "execute",
+        "database": "write",
+        "file": "write",
+        "email": "send",
+        "network": "send",
+        "browser": "read",
+        "llm": "override",
+        "code": "execute",
+    }
+    return mapping.get(tool)
+
+
+def _infer_tool_from_action(action: str, content: str = "") -> Optional[str]:
+    content_lower = content.lower()
+    if any(k in content for k in ("数据库", "sql", "查询", "select", "delete from", "drop table")):
+        return "database"
+    if any(k in content for k in ("shell", "bash", "cmd", "powershell", "终端")):
+        return "shell"
+    if any(k in content for k in ("邮件", "邮箱", "email", "smtp")):
+        return "email"
+    if any(k in content for k in ("浏览器", "browser", "网页", "url", "http")):
+        return "browser"
+    if any(k in content for k in ("网络", "上传", "下载", "远程", "服务器", "ssh", "ftp")):
+        return "network"
+    if any(k in content for k in ("文件", "目录", "路径", "document", "folder")):
+        return "file"
+    if any(k in content for k in ("系统提示词", "prompt", "ignore previous", "developer mode", "jailbreak")):
+        return "llm"
+    mapping = {
+        "execute": "shell",
+        "send": "network",
+        "write": "file",
+        "read": "file",
+        "delete": "file",
+        "download": "network",
+        "login": "database",
+        "leak": "network",
+        "override": "llm",
+    }
+    return mapping.get(action)
+
+
+def _infer_data_type_from_action(action: str, content: str) -> Optional[str]:
+    if action in ("login", "read"):
+        if any(k in content for k in ("密码", "password", "token", "密钥")):
+            return "password"
+        if any(k in content for k in ("身份证", "手机号", "个人信息", "隐私")):
+            return "personal_info"
+        if any(k in content for k in ("数据库", "SQL", "记录")):
+            return "database_record"
+    if action == "leak":
+        if any(k in content for k in ("密码", "token", "密钥", "凭证")):
+            return "credential"
+    return None
+
+
+def _infer_action_from_content(content: str) -> Optional[str]:
+    content_lower = content.lower()
+    if any(k in content for k in ("查询", "查看", "获取", "导出", "访问", "查找")):
+        return "read"
+    if any(k in content for k in ("发送", "上传", "传输", "外传", "邮箱", "邮件")):
+        return "send"
+    if any(k in content for k in ("写入", "修改", "更新", "保存")):
+        return "write"
+    if any(k in content for k in ("删除", "清空", "格式化", "移除")):
+        return "delete"
+    if any(k in content for k in ("执行", "运行", "安装")):
+        return "execute"
+    if any(k in content for k in ("下载", "拉取")):
+        return "download"
+    if any(k in content for k in ("登录", "签入", "认证")):
+        return "login"
+    if any(k in content for k in ("忽略", "绕过", "扮演")):
+        return "override"
+    if "输出" in content or "泄露" in content or "告诉我" in content:
+        return "leak"
+    return None
+
+
 def _build_node(
     node_id: str,
     actions: List[str],
@@ -125,15 +218,47 @@ def _build_node(
     actor: str = "agent",
     obj: str = "",
 ) -> Dict[str, Any]:
+    action = actions[0] if actions else "unknown"
+    tool = tools[0] if tools else "unknown"
+    data_type = data_types[0] if data_types else "unknown"
+    permission = permissions[0] if permissions else "unknown"
+    destination = destinations[0] if destinations else "local"
+
+    # Try to infer missing fields
+    if action == "unknown" and tool != "unknown":
+        inferred = _infer_action_from_tool(tool)
+        if inferred:
+            action = inferred
+    if tool == "unknown" and action != "unknown":
+        inferred = _infer_tool_from_action(action, evidence)
+        if inferred:
+            tool = inferred
+    if data_type == "unknown" and action != "unknown":
+        inferred = _infer_data_type_from_action(action, evidence)
+        if inferred:
+            data_type = inferred
+    if action == "unknown" and data_type != "unknown":
+        if data_type in ("password", "token", "personal_info", "credential", "database_record"):
+            action = "read"
+        elif data_type in ("code", "system_file"):
+            action = "execute"
+        elif data_type == "prompt":
+            action = "override"
+    if action == "unknown" and tool == "unknown":
+        inferred = _infer_action_from_content(evidence)
+        if inferred:
+            action = inferred
+            tool = _infer_tool_from_action(action, evidence) or "unknown"
+
     return {
         "id": node_id,
         "actor": actor,
-        "tool": tools[0] if tools else "unknown",
-        "action": actions[0] if actions else "unknown",
+        "tool": tool,
+        "action": action,
         "object": obj or evidence[:50],
-        "data_type": data_types[0] if data_types else "unknown",
-        "permission": permissions[0] if permissions else "unknown",
-        "destination": destinations[0] if destinations else "local",
+        "data_type": data_type,
+        "permission": permission,
+        "destination": destination,
         "confidence": 0.7,
         "evidence_text": evidence,
     }
@@ -182,6 +307,9 @@ def extract_by_fallback(input_type: str, content: str) -> dict:
             step_tools = all_tools
             step_permissions = all_permissions
             step_destinations = all_destinations
+        elif step_actions and not step_data_types and all_data_types:
+            # 如果步骤有动作但没有数据类型，继承全局数据类型
+            step_data_types = all_data_types
 
         node_id = f"n{idx + 1}"
         obj = ""

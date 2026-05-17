@@ -13,7 +13,7 @@
     </div>
 
     <div v-if="!report" class="empty">
-      <p>选择一个扫描任务查看风控报告</p>
+      <p>{{ errorMessage || '选择一个扫描任务查看风控报告' }}</p>
     </div>
 
     <div v-else class="report-content">
@@ -50,12 +50,12 @@
 
       <!-- 防线评估 -->
       <div class="card" v-if="defenseStats">
-        <h3>五层防线评估</h3>
+        <h3>五层防线命中分布</h3>
         <div class="defense-grid">
           <div v-for="(stat, layer) in defenseStats" :key="layer" class="defense-card" :class="layer.toLowerCase()">
             <div class="defense-layer">{{ layer }}</div>
             <div class="defense-rate">{{ stat.rate }}%</div>
-            <div class="defense-detail">{{ stat.breached }}/{{ stat.total }} 被攻破</div>
+            <div class="defense-detail">{{ stat.breached }}/{{ stat.total }} 漏洞载荷命中</div>
             <div class="defense-bar-wrap">
               <div class="defense-bar" :style="{ width: stat.rate + '%' }"></div>
             </div>
@@ -119,78 +119,68 @@ export default {
     const scans = ref([])
     const selectedScan = ref('')
     const report = ref(null)
+    const errorMessage = ref('')
+    const payloadResults = computed(() => report.value?.payload_results || [])
 
     const vulnerabilities = computed(() => {
-      if (!report.value?.results) return []
-      const vulns = []
-      for (const r of report.value.results) {
-        if (r.defense_breaches) {
-          for (const b of r.defense_breaches) {
-            vulns.push({
-              payload_id: r.payload_id,
-              layer: b.layer,
-              severity: b.severity,
-              cwe_id: b.cwe_id,
-              description: b.description,
-              suggestion: b.suggestion,
-              evidence: b.evidence,
-            })
+      return payloadResults.value
+        .filter(r => r.is_vulnerability)
+        .map(r => {
+          const breaches = r.defense_breaches || []
+          const primary = breaches[0] || {}
+          const layers = [...new Set(breaches.map(b => b.layer).filter(Boolean))].join('+')
+          return {
+            payload_id: r.payload_id,
+            layer: layers,
+            severity: r.vulnerability_severity,
+            cwe_id: primary.cwe_id || '',
+            description: primary.description || '',
+            suggestion: primary.suggestion || '',
+            evidence: primary.evidence || '',
           }
-        }
-      }
-      return vulns
+        })
     })
 
     const vulnTotal = computed(() => vulnerabilities.value.length)
 
     const severityDist = computed(() => {
-      const dist = { critical: 0, high: 0, medium: 0, low: 0 }
-      for (const v of vulnerabilities.value) {
-        if (dist[v.severity] !== undefined) dist[v.severity]++
-      }
-      return dist
+      return report.value?.stats?.severity_distribution || { critical: 0, high: 0, medium: 0, low: 0 }
     })
 
     const defenseStats = computed(() => {
-      if (!vulnerabilities.value.length) return null
-      const stats = {
-        L1: { total: 0, breached: 0 },
-        L2: { total: 0, breached: 0 },
-        L3: { total: 0, breached: 0 },
-        L4: { total: 0, breached: 0 },
-        L5: { total: 0, breached: 0 },
-      }
-      for (const v of vulnerabilities.value) {
-        for (const layer of v.layer.split('+')) {
-          const l = layer.trim()
-          if (stats[l]) {
-            stats[l].total++
-            stats[l].breached++
-          }
+      const distribution = report.value?.stats?.defense_layer_distribution
+      if (!distribution) return null
+      const total = report.value?.stats?.vulnerabilities_found || vulnerabilities.value.length
+      const stats = {}
+      for (const layer of ['L1', 'L2', 'L3', 'L4', 'L5']) {
+        const breached = distribution[layer] || 0
+        stats[layer] = {
+          breached,
+          total,
+          rate: total > 0 ? Math.round((breached / total) * 100) : 0,
         }
-      }
-      // Add total tested payloads per layer
-      const totalPayloads = report.value?.task?.total_payloads || 1
-      for (const key of Object.keys(stats)) {
-        stats[key].total = Math.max(stats[key].total, Math.floor(totalPayloads / 5))
-        stats[key].rate = stats[key].total > 0
-          ? Math.round((1 - stats[key].breached / stats[key].total) * 100)
-          : 100
       }
       return stats
     })
 
     const loadScans = async () => {
       try {
+        errorMessage.value = ''
         scans.value = (await getScans(null, 50)).scans || []
-      } catch (e) { /* */ }
+      } catch (e) {
+        errorMessage.value = '扫描任务加载失败: ' + (e.response?.data?.detail || e.message)
+      }
     }
 
     const loadReport = async () => {
       if (!selectedScan.value) { report.value = null; return }
       try {
+        errorMessage.value = ''
+        report.value = null
         report.value = await getScanDetail(selectedScan.value)
-      } catch (e) { /* */ }
+      } catch (e) {
+        errorMessage.value = '报告加载失败: ' + (e.response?.data?.detail || e.message)
+      }
     }
 
     const exportReport = async (format) => {
@@ -213,7 +203,7 @@ export default {
     onMounted(loadScans)
 
     return {
-      scans, selectedScan, report, vulnerabilities, vulnTotal, severityDist, defenseStats,
+      scans, selectedScan, report, errorMessage, vulnerabilities, vulnTotal, severityDist, defenseStats,
       loadReport, exportReport, statusLabel,
     }
   }

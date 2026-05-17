@@ -7,8 +7,8 @@
 
     <div class="controls">
       <div class="input-group">
-        <label>选择审计记录:</label>
-        <select v-model="selectedRecordId" @change="loadTrace">
+        <label for="trace-record-select">选择审计记录:</label>
+        <select id="trace-record-select" v-model="selectedRecordId" @change="loadTrace">
           <option value="">请选择...</option>
           <option v-for="r in records" :key="r.id" :value="r.id">
             #{{ r.id }} - {{ r.input_type }} - {{ r.risk_level }} ({{ r.risk_score }}分)
@@ -16,8 +16,8 @@
         </select>
       </div>
       <div class="input-group">
-        <label>或输入 Trace ID:</label>
-        <input v-model="traceIdInput" placeholder="输入 Trace ID" />
+        <label for="trace-id-input">或输入 Trace ID:</label>
+        <input id="trace-id-input" v-model="traceIdInput" placeholder="输入 Trace ID" />
         <button @click="loadTraceById">加载</button>
       </div>
     </div>
@@ -95,7 +95,7 @@
 
 <script>
 import { ref, onMounted } from 'vue'
-import { getRecords, getRecord } from '../api/request.js'
+import { getRecords, getRecord, getHistoryByTraceId } from '../api/request.js'
 
 export default {
   name: 'AttackTracePage',
@@ -134,11 +134,17 @@ export default {
 
     async function loadTraceById() {
       if (!traceIdInput.value) return
-      // 在记录中查找
-      const record = records.value.find(r => r.trace_id === traceIdInput.value)
-      if (record) {
-        selectedRecordId.value = record.id
-        await loadTrace()
+      try {
+        const record = await getHistoryByTraceId(traceIdInput.value)
+        if (record) {
+          selectedRecordId.value = record.id
+          if (record.behavior_chain) {
+            trace.value = convertToTrace(record)
+          }
+          breaches.value = record.defense_breaches || []
+        }
+      } catch (e) {
+        console.error('按 Trace ID 加载失败:', e)
       }
     }
 

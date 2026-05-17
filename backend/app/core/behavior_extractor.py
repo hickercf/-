@@ -104,12 +104,18 @@ async def extract_behavior_chain(input_type: str, content: str) -> Dict[str, Any
     agent_result = await extract_by_agent(input_type, content)
     fallback_result = extract_by_fallback(input_type, content)
 
+    result = None
     if is_valid_chain(agent_result):
         if _is_trivial_fallback(fallback_result):
-            return normalize_chain(fallback_result)
-        return merge_and_normalize(agent_result, fallback_result)
+            result = normalize_chain(agent_result)
+        else:
+            result = merge_and_normalize(agent_result, fallback_result)
+    else:
+        result = normalize_chain(fallback_result)
 
-    return normalize_chain(fallback_result)
+    result["input_type"] = input_type
+    result["input_text"] = content
+    return result
 
 
 def _is_trivial_fallback(fallback_result: Dict[str, Any]) -> bool:

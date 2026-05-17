@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import List, Optional, Literal
 
 
@@ -24,11 +24,16 @@ class AttackPayloadSchema(BaseModel):
 
 
 class PayloadCreate(BaseModel):
-    payload_id: str
-    category: str
-    title: str
-    severity: str = "medium"
-    template: str
+    payload_id: str = Field(min_length=1)
+    category: Literal[
+        "prompt_injection", "role_play_bypass", "encoding_bypass",
+        "language_confusion", "data_exfiltration", "privilege_escalation",
+        "tool_abuse", "chain_of_thought_hijack", "multi_turn_attack",
+        "context_overflow"
+    ]
+    title: str = Field(min_length=1)
+    severity: Literal["critical", "high", "medium", "low"] = "medium"
+    template: str = Field(min_length=1)
     params: List[PayloadParam] = []
     mutations: List[str] = []
     cwe_reference: str = ""

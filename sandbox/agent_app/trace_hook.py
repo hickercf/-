@@ -13,6 +13,8 @@ from .schemas import TraceEvent, AgentTrace
 class TraceCollector:
     """AgentTrace 采集器"""
     
+    _global_event_counter: int = 0
+    
     def __init__(self, trace_id: str = None, agent_name: str = "demo_customer_agent"):
         self.trace_id = trace_id or f"TRACE-{datetime.now().strftime('%Y%m%d')}-{uuid.uuid4().hex[:8].upper()}"
         self.agent_name = agent_name
@@ -106,8 +108,9 @@ class TraceCollector:
     
     def _add_event(self, event_type: str, actor: str, **kwargs):
         """添加事件"""
+        TraceCollector._global_event_counter += 1
         event = TraceEvent(
-            event_id=f"evt-{len(self.events):03d}",
+            event_id=f"evt-{TraceCollector._global_event_counter:06d}",
             event_type=event_type,
             actor=actor,
             **kwargs

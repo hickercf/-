@@ -3,12 +3,14 @@
     <div class="page-header">
       <h2>扫描控制台</h2>
       <div class="header-actions">
-        <select v-model="selectedTarget" class="target-select">
+        <label for="scan-target-select" class="sr-only">选择靶标 Agent</label>
+        <select id="scan-target-select" v-model="selectedTarget" class="target-select">
           <option value="">-- 选择靶标 Agent --</option>
           <option v-for="t in targets" :key="t.target_id" :value="t.target_id">{{ t.name }}</option>
         </select>
       </div>
     </div>
+    <div v-if="errorMessage" class="error-banner">{{ errorMessage }}</div>
 
     <div class="scan-layout">
       <!-- 左侧: 扫描配置 -->
@@ -46,8 +48,8 @@
             </div>
           </div>
           <div class="form-group">
-            <label>速率限制 (req/s)</label>
-            <input type="number" v-model.number="config.rate_limit" min="0.1" max="10" step="0.1" />
+            <label for="scan-rate-limit">速率限制 (req/s)</label>
+            <input id="scan-rate-limit" type="number" v-model.number="config.rate_limit" min="0.1" max="10" step="0.1" />
           </div>
           <button class="btn-primary btn-block" @click="startNewScan" :disabled="!selectedTarget || scanning">
             {{ scanning ? '扫描中...' : '开始扫描' }}
@@ -57,6 +59,42 @@
             <button v-if="activeScan.status === 'paused'" class="btn-sm" @click="resumeCurrentScan">恢复</button>
             <button v-if="['running','paused','pending'].includes(activeScan.status)" class="btn-sm btn-danger" @click="cancelCurrentScan">取消</button>
           </div>
+        </div>
+
+        <!-- 自定义 Payload -->
+        <div class="card">
+          <h3>自定义 Payload</h3>
+          <div class="form-group">
+            <label>Payload ID</label>
+            <input v-model="customPayload.payload_id" placeholder="如: CUSTOM-001" />
+          </div>
+          <div class="form-group">
+            <label>标题</label>
+            <input v-model="customPayload.title" placeholder="Payload 标题" />
+          </div>
+          <div class="form-group">
+            <label>分类</label>
+            <select v-model="customPayload.category">
+              <option value="">-- 选择分类 --</option>
+              <option v-for="c in categories" :key="c.id" :value="c.id">{{ c.label }}</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>严重度</label>
+            <select v-model="customPayload.severity">
+              <option value="low">低</option>
+              <option value="medium">中</option>
+              <option value="high">高</option>
+              <option value="critical">严重</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>模板内容</label>
+            <textarea v-model="customPayload.template" rows="4" placeholder="输入攻击载荷模板..."></textarea>
+          </div>
+          <button class="btn-secondary btn-block" @click="createCustomPayload" :disabled="!customPayload.payload_id || !customPayload.title || !customPayload.category || !customPayload.template">
+            添加自定义 Payload
+          </button>
         </div>
       </div>
 
@@ -81,10 +119,10 @@
           <div v-for="r in latestResults.slice(0, 5)" :key="r.id" class="result-item">
             <div class="result-header">
               <span class="payload-id">{{ r.payload_id }}</span>
-              <span :class="['severity-tag', r.vulnerability_severity || 'safe']">{{ r.vulnerability_severity || '安全' }}</span>
+              <span :class="['severity-tag', resultStatusClass(r)]">{{ resultStatusLabel(r) }}</span>
               <span class="resp-time">{{ r.response_time_ms }}ms</span>
             </div>
-            <div class="variant-text">{{ r.variant?.substring(0, 150) }}...</div>
+            <div class="variant-text">{{ (r.variant || '').substring(0, 150) }}{{ r.variant?.length > 150 ? '...' : '' }}</div>
             <div v-if="r.defense_breaches?.length" class="breaches">
               <div v-for="b in r.defense_breaches" :key="b.layer + b.step_index" :class="['breach-item', b.severity]">
                 <strong>{{ b.layer }}</strong> — {{ b.description }}
@@ -142,8 +180,8 @@
           <div v-for="r in scanDetail.results" :key="r.id" class="result-item">
             <div class="result-header">
               <span class="payload-id">{{ r.payload_id }}</span>
-              <span :class="['severity-tag', r.vulnerability_severity || 'safe']">
-                {{ r.vulnerability_severity || '安全' }}
+              <span :class="['severity-tag', resultStatusClass(r)]">
+                {{ resultStatusLabel(r) }}
               </span>
             </div>
             <div v-if="r.defense_breaches?.length">
@@ -162,7 +200,7 @@
 
 <script>
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
-import { getTargets, getScans, getScanDetail, startTargetScan, pauseScan, resumeScan, cancelScan } from '../api/request.js'
+import { getTargets, getScans, getScanDetail, startTargetScan, pauseScan, resumeScan, cancelScan, createPayload } from '../api/request.js'
 
 export default {
   name: 'ScanConsole',
@@ -174,6 +212,7 @@ export default {
     const scanHistory = ref([])
     const scanDetail = ref(null)
     const latestResults = ref([])
+    const errorMessage = ref('')
     let ws = null
     let pollTimer = null
 
@@ -182,6 +221,17 @@ export default {
       categories: [],
       mutation_strategies: [],
       rate_limit: 1.0,
+    })
+
+    const customPayload = reactive({
+      payload_id: '',
+      title: '',
+      category: '',
+      severity: 'medium',
+      template: '',
+      params: [],
+      mutations: [],
+      cwe_reference: '',
     })
 
     const scanModes = [
@@ -212,11 +262,36 @@ export default {
     })
 
     const loadTargets = async () => {
-      try { targets.value = (await getTargets()).targets || [] } catch (e) { /* */ }
+      try {
+        errorMessage.value = ''
+        targets.value = (await getTargets()).targets || []
+      } catch (e) {
+        errorMessage.value = '靶标加载失败: ' + (e.response?.data?.detail || e.message)
+      }
     }
 
     const loadScanHistory = async () => {
-      try { scanHistory.value = (await getScans(null, 30)).scans || [] } catch (e) { /* */ }
+      try {
+        errorMessage.value = ''
+        scanHistory.value = (await getScans(null, 30)).scans || []
+      } catch (e) {
+        errorMessage.value = '扫描历史加载失败: ' + (e.response?.data?.detail || e.message)
+      }
+    }
+
+    const restoreActiveScan = async () => {
+      await loadScanHistory()
+      const resumable = scanHistory.value.find(s => ['running', 'paused', 'pending'].includes(s.status))
+      if (!resumable) return
+
+      activeScan.value = resumable
+      scanning.value = ['running', 'pending'].includes(resumable.status)
+      await refreshActiveScan()
+
+      if (activeScan.value && ['running', 'pending'].includes(activeScan.value.status)) {
+        if (pollTimer) clearInterval(pollTimer)
+        pollTimer = setInterval(refreshActiveScan, 2000)
+      }
     }
 
     const refreshActiveScan = async () => {
@@ -226,11 +301,14 @@ export default {
         activeScan.value = data.task
         latestResults.value = data.results || []
         if (['completed', 'failed', 'cancelled'].includes(data.task?.status)) {
+          clearInterval(pollTimer)
           activeScan.value = null
           scanning.value = false
           await loadScanHistory()
         }
-      } catch (e) { /* */ }
+      } catch (e) {
+        errorMessage.value = '扫描进度刷新失败: ' + (e.response?.data?.detail || e.message)
+      }
     }
 
     const startNewScan = async () => {
@@ -238,7 +316,9 @@ export default {
       scanning.value = true
       try {
         const result = await startTargetScan(selectedTarget.value, { ...config })
-        activeScan.value = { scan_id: result.scan_id, completed_payloads: 0, total_payloads: 0, vulnerabilities_found: 0, status: 'running' }
+        activeScan.value = { scan_id: result.scan_id, completed_payloads: 0, total_payloads: result.total_payloads || 0, vulnerabilities_found: 0, status: 'running' }
+        await loadScanHistory()
+        if (pollTimer) clearInterval(pollTimer)
         pollTimer = setInterval(refreshActiveScan, 2000)
       } catch (e) {
         alert('启动扫描失败: ' + (e.response?.data?.detail || e.message))
@@ -248,29 +328,62 @@ export default {
 
     const pauseCurrentScan = async () => {
       if (!activeScan.value) return
-      await pauseScan(activeScan.value.scan_id)
-      activeScan.value.status = 'paused'
+      try {
+        await pauseScan(activeScan.value.scan_id)
+        activeScan.value.status = 'paused'
+      } catch (e) {
+        alert('暂停扫描失败: ' + (e.response?.data?.detail || e.message))
+      }
     }
 
     const resumeCurrentScan = async () => {
       if (!activeScan.value) return
-      await resumeScan(activeScan.value.scan_id)
-      activeScan.value.status = 'running'
+      try {
+        await resumeScan(activeScan.value.scan_id)
+        activeScan.value.status = 'running'
+        scanning.value = true
+        if (pollTimer) clearInterval(pollTimer)
+        pollTimer = setInterval(refreshActiveScan, 2000)
+      } catch (e) {
+        alert('恢复扫描失败: ' + (e.response?.data?.detail || e.message))
+      }
     }
 
     const cancelCurrentScan = async () => {
       if (!activeScan.value) return
-      await cancelScan(activeScan.value.scan_id)
-      activeScan.value.status = 'cancelled'
-      scanning.value = false
-      clearInterval(pollTimer)
-      await loadScanHistory()
+      try {
+        await cancelScan(activeScan.value.scan_id)
+        activeScan.value.status = 'cancelled'
+        scanning.value = false
+        clearInterval(pollTimer)
+        await loadScanHistory()
+      } catch (e) {
+        alert('取消扫描失败: ' + (e.response?.data?.detail || e.message))
+      }
     }
 
     const viewScanDetail = async (s) => {
       try {
         scanDetail.value = await getScanDetail(s.scan_id)
-      } catch (e) { /* */ }
+      } catch (e) {
+        errorMessage.value = '扫描详情加载失败: ' + (e.response?.data?.detail || e.message)
+      }
+    }
+
+    const createCustomPayload = async () => {
+      if (!customPayload.payload_id || !customPayload.template) return
+      try {
+        await createPayload({ ...customPayload })
+        alert('自定义 Payload 添加成功')
+        // 清空表单
+        customPayload.payload_id = ''
+        customPayload.title = ''
+        customPayload.category = ''
+        customPayload.severity = 'medium'
+        customPayload.template = ''
+      } catch (e) {
+        alert('添加失败: ' + (e.response?.data?.detail || e.message))
+      }
     }
 
     const statusLabel = (s) => ({
@@ -278,13 +391,20 @@ export default {
       paused: '已暂停', cancelled: '已取消', failed: '失败'
     }[s] || s)
 
-    onMounted(() => { loadTargets(); loadScanHistory() })
+    const resultStatusClass = (r) => r?.react_trace?.error ? 'error' : (r?.vulnerability_severity || 'safe')
+    const resultStatusLabel = (r) => r?.react_trace?.error ? '执行失败' : (r?.vulnerability_severity || '安全')
+
+    onMounted(async () => {
+      await loadTargets()
+      await restoreActiveScan()
+    })
     onUnmounted(() => { if (pollTimer) clearInterval(pollTimer) })
 
     return {
-      targets, selectedTarget, scanning, activeScan, scanHistory, scanDetail, latestResults,
+      targets, selectedTarget, scanning, activeScan, scanHistory, scanDetail, latestResults, errorMessage,
       config, scanModes, categories, commonMutations, progressPct,
-      startNewScan, pauseCurrentScan, resumeCurrentScan, cancelCurrentScan, viewScanDetail, statusLabel,
+      customPayload, createCustomPayload,
+      startNewScan, pauseCurrentScan, resumeCurrentScan, cancelCurrentScan, viewScanDetail, statusLabel, resultStatusClass, resultStatusLabel,
     }
   }
 }
@@ -293,6 +413,18 @@ export default {
 <style scoped>
 .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
 .target-select { padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; min-width: 250px; }
+.error-banner { margin-bottom: 16px; padding: 10px 12px; border: 1px solid #fecaca; border-radius: 6px; background: #fef2f2; color: #b91c1c; font-size: 13px; }
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
 .scan-layout { display: grid; grid-template-columns: 320px 1fr; gap: 20px; }
 .card { background: #fff; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); padding: 16px; margin-bottom: 16px; }
 .card h3 { margin: 0 0 12px; font-size: 15px; }
@@ -327,6 +459,7 @@ export default {
 .severity-tag.medium { background: #fef08a; color: #ca8a04; }
 .severity-tag.low { background: #dbeafe; color: #2563eb; }
 .severity-tag.safe { background: #d1fae5; color: #059669; }
+.severity-tag.error { background: #e5e7eb; color: #4b5563; }
 .resp-time { font-size: 11px; color: #94a3b8; margin-left: auto; }
 .variant-text { font-size: 12px; color: #64748b; margin-bottom: 4px; word-break: break-all; }
 
@@ -362,7 +495,11 @@ export default {
 .btn-primary:hover { background: #1d4ed8; }
 .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
 .btn-secondary { background: #e2e8f0; color: #475569; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 13px; }
+.btn-secondary:hover { background: #cbd5e1; }
+.btn-secondary:disabled { opacity: 0.5; cursor: not-allowed; }
 .btn-sm { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; }
 .btn-danger { color: #dc2626; border-color: #fecaca; }
 .empty-text { text-align: center; color: #94a3b8; padding: 20px; }
+.form-group textarea { width: 100%; padding: 7px 10px; border: 1px solid #cbd5e1; border-radius: 5px; font-size: 13px; resize: vertical; }
+.form-group select { width: 100%; padding: 7px 10px; border: 1px solid #cbd5e1; border-radius: 5px; font-size: 13px; background: white; }
 </style>

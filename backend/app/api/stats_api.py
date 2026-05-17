@@ -30,18 +30,19 @@ async def scan_stats():
 
     # 漏洞严重度汇总
     severity_summary = {"critical": 0, "high": 0, "medium": 0, "low": 0}
+    defense_layer_distribution = {"L1": 0, "L2": 0, "L3": 0, "L4": 0, "L5": 0}
     for s in scans:
-        summary = s.get("summary", {})
-        if isinstance(summary, str):
-            import json
-            try:
-                summary = json.loads(summary)
-            except Exception:
-                summary = {}
+        if s.get("status") != "completed":
+            continue
+        summary = await get_scan_stats(s.get("scan_id"))
         sev_dist = summary.get("severity_distribution", {})
         for sev, count in sev_dist.items():
             if sev in severity_summary:
                 severity_summary[sev] += count
+        layer_dist = summary.get("defense_layer_distribution", {})
+        for layer, count in layer_dist.items():
+            if layer in defense_layer_distribution:
+                defense_layer_distribution[layer] += count
 
     # 最近扫描
     recent_scans = []
@@ -62,6 +63,7 @@ async def scan_stats():
         "total_payloads_tested": total_payloads,
         "scan_mode_distribution": mode_dist,
         "severity_summary": severity_summary,
+        "defense_layer_distribution": defense_layer_distribution,
         "recent_scans": recent_scans,
         "payload_categories": await get_payload_categories(),
     }

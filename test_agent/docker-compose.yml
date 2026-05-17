@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  high-security-agent:
+    build: .
+    ports:
+      - "50001:50001"
+    environment:
+      - AGENT_TYPE=high
+    command: python high_security_agent.py
+    networks:
+      - agent-network
+
+  medium-security-agent:
+    build: .
+    ports:
+      - "50002:50002"
+    environment:
+      - AGENT_TYPE=medium
+    command: python medium_security_agent.py
+    networks:
+      - agent-network
+
+  low-security-agent:
+    build: .
+    ports:
+      - "50003:50003"
+    environment:
+      - AGENT_TYPE=low
+    command: python low_security_agent.py
+    networks:
+      - agent-network
+
+  vulnerable-agent:
+    build: .
+    ports:
+      - "50004:50004"
+    environment:
+      - AGENT_TYPE=vulnerable
+    command: python vulnerable_agent.py
+    networks:
+      - agent-network
+
+networks:
+  agent-network:
+    driver: bridge

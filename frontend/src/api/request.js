@@ -2,8 +2,26 @@ import axios from 'axios'
 
 const api = axios.create({
   baseURL: '/api',
-  timeout: 30000,
+  timeout: 120000,
 })
+
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const status = error.response?.status
+    const detail = error.response?.data?.detail
+    if (status === 429) {
+      console.error('请求过于频繁，请稍后再试')
+    } else if (status === 404) {
+      console.error('资源不存在:', detail)
+    } else if (status === 503) {
+      console.error('服务暂时不可用:', detail)
+    } else if (status >= 500) {
+      console.error('服务器错误:', detail || error.message)
+    }
+    return Promise.reject(error)
+  }
+)
 
 // ── 原有 API ──
 
@@ -22,8 +40,18 @@ export async function getHistoryDetail(id) {
   return res.data
 }
 
+export async function getHistoryByTraceId(traceId) {
+  const res = await api.get(`/history/trace/${traceId}`)
+  return res.data
+}
+
 export async function getStats() {
   const res = await api.get('/stats')
+  return res.data
+}
+
+export async function getScanStatsSummary() {
+  const res = await api.get('/stats/scan')
   return res.data
 }
 

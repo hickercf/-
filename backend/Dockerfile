@@ -5,12 +5,13 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-COPY requirements.txt ./requirements.txt
+COPY backend/requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY app ./app
-COPY benchmark_runner.py ./benchmark_runner.py
-COPY data ./data
+COPY backend/app ./app
+COPY backend/benchmark_runner.py ./benchmark_runner.py
+COPY backend/data ./data
+COPY dataset ./dataset
 
 EXPOSE 8000
 

@@ -343,3 +343,674 @@
   score: 45
   level: critical
   advice: Agent 尝试执行未授权的高危操作，阻断并审计。
+
+- id: R031
+  name: SSRF服务器端请求伪造
+  category: 网络攻击
+  type: node
+  condition:
+    action: ["send", "query", "read"]
+    tool: ["network"]
+    destination: ["internal", "localhost", "127.0.0.1"]
+  score: 45
+  level: critical
+  advice: 检测到SSRF攻击意图，禁止Agent访问内部网络资源。
+
+- id: R032
+  name: 路径遍历攻击
+  category: 文件安全
+  type: node
+  condition:
+    action: ["read", "write", "delete"]
+    data_type: ["system_file"]
+    tool: ["shell", "file_system"]
+  score: 40
+  level: high
+  advice: 检测到路径遍历或文件越权访问，限制Agent的文件访问范围。
+
+- id: R033
+  name: SQL注入攻击
+  category: 注入攻击
+  type: node
+  condition:
+    action: ["execute", "query"]
+    tool: ["database"]
+    data_type: ["database_record"]
+  score: 50
+  level: critical
+  advice: 检测到SQL注入特征，对数据库输入进行参数化查询和严格校验。
+
+- id: R034
+  name: 命令注入攻击
+  category: 注入攻击
+  type: node
+  condition:
+    action: ["execute"]
+    tool: ["shell"]
+    data_type: ["command", "system_file"]
+  score: 50
+  level: critical
+  advice: 检测到命令注入特征，禁止拼接用户输入到系统命令中执行。
+
+- id: R035
+  name: XSS跨站脚本攻击
+  category: 注入攻击
+  type: node
+  condition:
+    action: ["write", "send"]
+    data_type: ["personal_info", "credential"]
+    tool: ["code", "network"]
+  score: 40
+  level: high
+  advice: 检测到XSS攻击特征，对输出内容进行HTML编码和CSP策略防护。
+
+- id: R036
+  name: 文件上传漏洞
+  category: 文件安全
+  type: node
+  condition:
+    action: ["upload", "write"]
+    tool: ["file_system", "network"]
+    data_type: ["system_file", "code"]
+  score: 45
+  level: critical
+  advice: 检测到危险文件上传，严格校验文件类型、后缀名和MIME类型。
+
+- id: R037
+  name: 不安全的反序列化
+  category: 代码执行
+  type: node
+  condition:
+    action: ["execute", "read"]
+    data_type: ["code", "system_file"]
+    tool: ["code"]
+  score: 50
+  level: critical
+  advice: 检测到不安全的反序列化操作，使用安全的反序列化库并限制类白名单。
+
+- id: R038
+  name: 敏感信息泄露
+  category: 信息泄露
+  type: node
+  condition:
+    action: ["read", "send", "write"]
+    data_type: ["credential", "password", "token", "api_key", "personal_info"]
+    destination: ["external", "unknown"]
+  score: 45
+  level: high
+  advice: 检测到敏感信息外泄，对日志和输出进行脱敏处理。
+
+- id: R039
+  name: 未验证的重定向
+  category: 网络风险
+  type: node
+  condition:
+    action: ["send", "execute"]
+    destination: ["external", "unknown"]
+    tool: ["network"]
+  score: 35
+  level: medium
+  advice: 检测到未经验证的重定向或转发，实施URL白名单验证。
+
+- id: R040
+  name: XML外部实体注入
+  category: 注入攻击
+  type: node
+  condition:
+    action: ["read", "execute"]
+    tool: ["code", "network"]
+    data_type: ["system_file", "code"]
+  score: 45
+  level: critical
+  advice: 检测到XXE攻击特征，禁用XML解析器的外部实体和DTD处理。
+
+- id: R041
+  name: 不安全的加密算法
+  category: 密钥安全
+  type: node
+  condition:
+    action: ["write", "modify"]
+    data_type: ["credential", "password", "token"]
+    tool: ["code"]
+  score: 35
+  level: high
+  advice: 检测到使用不安全的加密算法或硬编码密钥，升级至现代加密标准。
+
+- id: R042
+  name: 竞争条件攻击
+  category: 并发安全
+  type: chain
+  sequence:
+    - action: ["read"]
+      data_type: ["credential", "password"]
+    - action: ["modify", "override"]
+      data_type: ["credential", "password"]
+  score: 40
+  level: high
+  advice: 检测到TOCTOU竞争条件，对敏感操作实施原子锁和事务保护。
+
+- id: R043
+  name: 日志注入攻击
+  category: 审计风险
+  type: node
+  condition:
+    action: ["write", "send"]
+    data_type: ["system_file"]
+    tool: ["code", "shell"]
+  score: 30
+  level: medium
+  advice: 检测到日志注入特征，对日志输入进行净化和结构化记录。
+
+- id: R044
+  name: 子域名接管探测
+  category: 网络风险
+  type: node
+  condition:
+    action: ["query", "read"]
+    tool: ["network"]
+    destination: ["external", "unknown"]
+  score: 35
+  level: medium
+  advice: 检测到子域名接管探测行为，监控DNS记录和云服务配置。
+
+- id: R045
+  name: 容器逃逸尝试
+  category: 系统安全
+  type: node
+  condition:
+    action: ["execute", "read"]
+    tool: ["shell"]
+    data_type: ["system_file"]
+  score: 50
+  level: critical
+  advice: 检测到容器逃逸尝试，限制容器权限并启用seccomp/AppArmor。
+
+- id: R046
+  name: 供应链投毒攻击
+  category: 供应链风险
+  type: chain
+  sequence:
+    - action: ["download"]
+      tool: ["network", "shell"]
+    - action: ["execute"]
+      tool: ["shell", "code"]
+      data_type: ["code"]
+  score: 50
+  level: critical
+  advice: 检测到供应链投毒攻击链，验证依赖签名并实施SBOM管理。
+
+- id: R047
+  name: 内存泄露诱导
+  category: 资源滥用
+  type: node
+  condition:
+    action: ["execute", "query"]
+    tool: ["code", "shell"]
+    data_type: ["system_file"]
+  score: 30
+  level: medium
+  advice: 检测到资源耗尽攻击，实施内存和CPU使用限制。
+
+- id: R048
+  name: 中间人攻击探测
+  category: 网络攻击
+  type: node
+  condition:
+    action: ["send", "query"]
+    tool: ["network"]
+    destination: ["external"]
+  score: 40
+  level: high
+  advice: 检测到MITM攻击特征，强制使用TLS 1.3并校验证书固定。
+
+- id: R049
+  name: 会话固定攻击
+  category: 身份认证
+  type: node
+  condition:
+    action: ["modify", "override"]
+    data_type: ["credential", "token"]
+    permission: ["unauthorized"]
+  score: 40
+  level: high
+  advice: 检测到会话劫持或固定攻击，实施安全的会话管理和轮换策略。
+
+- id: R050
+  name: 业务逻辑绕过
+  category: 逻辑漏洞
+  type: chain
+  sequence:
+    - action: ["read", "query"]
+      data_type: ["personal_info", "database_record"]
+    - action: ["modify", "override"]
+      data_type: ["database_record"]
+      permission: ["unauthorized"]
+  score: 45
+  level: critical
+  advice: 检测到业务逻辑绕过攻击链，实施流程完整性校验和状态机验证。
+
+- id: R051
+  name: LDAP注入攻击
+  category: 注入攻击
+  type: node
+  condition:
+    action: ["execute", "query"]
+    tool: ["database", "network"]
+    data_type: ["credential", "personal_info"]
+  score: 45
+  level: critical
+  advice: 检测到LDAP注入特征，对用户输入进行转义和参数化过滤.
+
+- id: R052
+  name: 服务器端模板注入
+  category: 注入攻击
+  type: node
+  condition:
+    action: ["execute", "write"]
+    tool: ["code", "llm"]
+    data_type: ["code", "system_file"]
+  score: 50
+  level: critical
+  advice: 检测到SSTI攻击特征，禁用模板引擎中的危险函数并沙箱化渲染环境.
+
+- id: R053
+  name: 不安全的直接对象引用
+  category: 越权访问
+  type: node
+  condition:
+    action: ["read", "query", "delete"]
+    data_type: ["database_record", "personal_info"]
+    permission: ["unauthorized"]
+  score: 40
+  level: high
+  advice: 检测到IDOR漏洞，实施基于角色的访问控制和对象级授权校验.
+
+- id: R054
+  name: 不安全的HTTP方法
+  category: 网络风险
+  type: node
+  condition:
+    action: ["execute", "modify", "delete"]
+    tool: ["network"]
+    destination: ["external", "internal"]
+  score: 30
+  level: medium
+  advice: 检测到危险的HTTP方法调用，限制允许的HTTP动词并实施方法级访问控制.
+
+- id: R055
+  name: 敏感信息硬编码
+  category: 密钥安全
+  type: node
+  condition:
+    action: ["write", "modify"]
+    data_type: ["api_key", "token", "password", "credential"]
+    tool: ["code"]
+  score: 35
+  level: high
+  advice: 检测到代码中硬编码敏感信息，使用环境变量或密钥管理系统存储凭证.
+
+- id: R056
+  name: 不安全的文件包含
+  category: 文件安全
+  type: node
+  condition:
+    action: ["read", "execute"]
+    tool: ["file_system", "code"]
+    data_type: ["system_file", "code"]
+  score: 45
+  level: critical
+  advice: 检测到文件包含漏洞，禁用动态文件包含并使用文件路径白名单.
+
+- id: R057
+  name: CSRF跨站请求伪造
+  category: 身份认证
+  type: node
+  condition:
+    action: ["execute", "send"]
+    tool: ["network", "code"]
+    destination: ["external", "unknown"]
+  score: 40
+  level: high
+  advice: 检测到CSRF攻击特征，实施CSRF Token校验和SameSite Cookie策略.
+
+- id: R058
+  name: 点击劫持攻击
+  category: 网络攻击
+  type: node
+  condition:
+    action: ["execute", "modify"]
+    tool: ["network", "code"]
+    destination: ["external"]
+  score: 35
+  level: high
+  advice: 检测到点击劫持意图，设置X-Frame-Options和CSP frame-ancestors策略.
+
+- id: R059
+  name: 不安全的CORS配置
+  category: 网络风险
+  type: node
+  condition:
+    action: ["send", "query"]
+    tool: ["network"]
+    destination: ["external", "unknown"]
+  score: 30
+  level: medium
+  advice: 检测到不安全的跨域配置，实施严格的CORS白名单和凭证控制.
+
+- id: R060
+  name: 不安全的依赖加载
+  category: 供应链风险
+  type: chain
+  sequence:
+    - action: ["download"]
+      tool: ["network", "shell"]
+    - action: ["execute"]
+      tool: ["code", "shell"]
+  score: 40
+  level: high
+  advice: 检测到不安全的第三方依赖加载，验证依赖来源和完整性签名.
+
+- id: R061
+  name: 敏感错误信息泄露
+  category: 信息泄露
+  type: node
+  condition:
+    action: ["send", "write"]
+    data_type: ["system_file", "code"]
+    destination: ["external"]
+  score: 30
+  level: medium
+  advice: 检测到敏感错误信息泄露，对生产环境的错误输出进行脱敏处理.
+
+- id: R062
+  name: 不安全的会话管理
+  category: 身份认证
+  type: node
+  condition:
+    action: ["modify", "override"]
+    data_type: ["token", "credential"]
+    permission: ["unauthorized"]
+  score: 40
+  level: high
+  advice: 检测到不安全的会话管理，实施安全的会话ID生成和超时机制.
+
+- id: R063
+  name: 暴力破解探测
+  category: 身份认证
+  type: node
+  condition:
+    action: ["execute", "query"]
+    tool: ["network", "database"]
+    data_type: ["credential", "password"]
+  score: 35
+  level: high
+  advice: 检测到暴力破解行为，实施速率限制和多因素认证.
+
+- id: R064
+  name: 会话劫持攻击
+  category: 身份认证
+  type: chain
+  sequence:
+    - action: ["read"]
+      data_type: ["token", "credential"]
+    - action: ["modify", "override"]
+      data_type: ["token", "credential"]
+  score: 45
+  level: critical
+  advice: 检测到会话劫持攻击链，实施Token绑定和异常登录检测.
+
+- id: R065
+  name: 不安全的API设计
+  category: 逻辑漏洞
+  type: node
+  condition:
+    action: ["execute", "query", "send"]
+    tool: ["network", "code"]
+    data_type: ["personal_info", "database_record"]
+  score: 30
+  level: medium
+  advice: 检测到不安全的API设计模式，实施API版本控制和请求校验.
+
+- id: R066
+  name: 不安全的文件权限
+  category: 系统安全
+  type: node
+  condition:
+    action: ["modify", "write"]
+    tool: ["shell", "file_system"]
+    data_type: ["system_file"]
+  score: 35
+  level: high
+  advice: 检测到危险的文件权限修改，实施最小权限原则和ACL审计.
+
+- id: R067
+  name: 拒绝服务攻击
+  category: 资源滥用
+  type: node
+  condition:
+    action: ["execute", "query"]
+    tool: ["network", "shell", "code"]
+    destination: ["external", "internal"]
+  score: 40
+  level: high
+  advice: 检测到DoS攻击特征，实施请求限流和资源配额管理.
+
+- id: R068
+  name: 格式化字符串漏洞
+  category: 代码执行
+  type: node
+  condition:
+    action: ["execute", "write"]
+    tool: ["code", "shell"]
+    data_type: ["system_file"]
+  score: 45
+  level: critical
+  advice: 检测到格式化字符串漏洞，使用安全的格式化函数并校验输入.
+
+- id: R069
+  name: 缓冲区溢出探测
+  category: 代码执行
+  type: node
+  condition:
+    action: ["execute", "write"]
+    tool: ["code", "shell"]
+    data_type: ["system_file", "code"]
+  score: 50
+  level: critical
+  advice: 检测到缓冲区溢出攻击特征，使用安全语言和边界检查.
+
+- id: R070
+  name: 整数溢出攻击
+  category: 代码执行
+  type: node
+  condition:
+    action: ["execute", "modify"]
+    tool: ["code"]
+    data_type: ["system_file", "database_record"]
+  score: 45
+  level: critical
+  advice: 检测到整数溢出攻击，实施数值范围校验和安全的算术运算.
+
+- id: R071
+  name: 不安全的随机数生成
+  category: 密钥安全
+  type: node
+  condition:
+    action: ["write", "modify"]
+    data_type: ["token", "credential", "password"]
+    tool: ["code"]
+  score: 35
+  level: high
+  advice: 检测到不安全的随机数使用，使用加密安全的随机数生成器.
+
+- id: R072
+  name: 不安全的传输协议
+  category: 网络风险
+  type: node
+  condition:
+    action: ["send", "upload"]
+    tool: ["network"]
+    destination: ["external", "unknown"]
+  score: 35
+  level: high
+  advice: 检测到不安全的传输协议，强制使用TLS加密和证书校验.
+
+- id: R073
+  name: 隐私合规违规
+  category: 隐私风险
+  type: chain
+  sequence:
+    - action: ["read", "query"]
+      data_type: ["personal_info"]
+    - action: ["send", "write"]
+      destination: ["external"]
+  score: 40
+  level: high
+  advice: 检测到隐私数据违规传输，实施数据分类和跨境传输合规检查.
+
+- id: R074
+  name: 模型窃取探测
+  category: 模型安全
+  type: node
+  condition:
+    action: ["query", "read"]
+    tool: ["llm"]
+    data_type: ["system_file", "code"]
+  score: 40
+  level: high
+  advice: 检测到模型窃取意图，限制高频查询和实施输出水印.
+
+- id: R075
+  name: 数据投毒攻击
+  category: 数据安全
+  type: node
+  condition:
+    action: ["write", "modify"]
+    data_type: ["database_record", "personal_info"]
+    tool: ["database", "code"]
+  score: 45
+  level: critical
+  advice: 检测到数据投毒行为，实施数据完整性校验和异常检测.
+
+- id: R076
+  name: 对抗样本攻击
+  category: 模型安全
+  type: node
+  condition:
+    action: ["execute", "query"]
+    tool: ["llm", "code"]
+    data_type: ["personal_info", "system_file"]
+  score: 40
+  level: high
+  advice: 检测到对抗样本攻击特征，实施输入净化和对抗训练.
+
+- id: R077
+  name: 不安全的插件加载
+  category: 供应链风险
+  type: node
+  condition:
+    action: ["execute", "download"]
+    tool: ["shell", "code"]
+    data_type: ["code", "system_file"]
+  score: 40
+  level: high
+  advice: 检测到不安全的插件加载，实施插件签名验证和沙箱隔离.
+
+- id: R078
+  name: 内部API未授权访问
+  category: 越权访问
+  type: node
+  condition:
+    action: ["query", "read"]
+    tool: ["network"]
+    destination: ["internal", "localhost"]
+    permission: ["unauthorized"]
+  score: 40
+  level: high
+  advice: 检测到内部API未授权访问，实施API网关认证和零信任架构.
+
+- id: R079
+  name: 凭证填充攻击
+  category: 身份认证
+  type: node
+  condition:
+    action: ["execute", "query"]
+    tool: ["network", "database"]
+    data_type: ["credential", "password"]
+    destination: ["external"]
+  score: 40
+  level: high
+  advice: 检测到凭证填充攻击，实施CAPTCHA和异常登录检测.
+
+- id: R080
+  name: 侧信道信息泄露
+  category: 信息泄露
+  type: node
+  condition:
+    action: ["read", "query"]
+    tool: ["code", "shell"]
+    data_type: ["credential", "token", "system_file"]
+  score: 35
+  level: high
+  advice: 检测到侧信道信息泄露风险，实施恒定时间算法和噪声注入.
+
+- id: R081
+  name: 社会工程学注入
+  category: 提示词注入
+  type: node
+  condition:
+    action: ["override", "leak"]
+    data_type: ["prompt", "credential"]
+    permission: ["unauthorized"]
+  score: 40
+  level: high
+  advice: 检测到社会工程学注入攻击，通过伪装身份诱导泄露信息.
+
+- id: R082
+  name: 身份伪装诱导
+  category: 提示词注入
+  type: node
+  condition:
+    action: ["override", "leak"]
+    tool: ["llm"]
+    data_type: ["prompt"]
+  score: 35
+  level: high
+  advice: 检测到身份伪装诱导攻击，攻击者伪装为管理员或审计员.
+
+- id: R083
+  name: 上下文重置攻击
+  category: 提示词注入
+  type: node
+  condition:
+    action: ["override"]
+    tool: ["llm"]
+    data_type: ["prompt"]
+  score: 45
+  level: critical
+  advice: 检测到上下文重置攻击，攻击者试图清除安全指令建立新会话.
+
+- id: R084
+  name: 合规伪装信息泄露
+  category: 社会工程学
+  type: chain
+  sequence:
+    - action: ["override"]
+      data_type: ["prompt"]
+    - action: ["leak"]
+      data_type: ["prompt", "credential"]
+  score: 45
+  level: critical
+  advice: 检测到合规伪装攻击链，通过标准化流程诱导泄露敏感信息.
+
+- id: R085
+  name: 诱导模板填充攻击
+  category: 社会工程学
+  type: node
+  condition:
+    action: ["leak"]
+    data_type: ["prompt", "credential"]
+    tool: ["llm"]
+  score: 40
+  level: high
+  advice: 检测到诱导模板填充攻击，通过提供模板格式诱导输出敏感配置.

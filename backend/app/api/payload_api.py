@@ -6,6 +6,7 @@ from app.database.db import (
     save_payload, get_all_payloads, get_payload_by_id, delete_payload, get_payload_categories,
 )
 from app.core.payload_loader import PayloadLoader, MUTATION_STRATEGIES
+from app.schemas.payload_schema import PayloadCreate
 
 router = APIRouter(prefix="/api/payloads", tags=["payloads"])
 _loader = PayloadLoader()
@@ -14,17 +15,30 @@ _loader = PayloadLoader()
 @router.get("")
 async def list_payloads(category: str = None):
     """获取载荷库列表，可选按分类筛选"""
-    payloads = await get_all_payloads(category=category)
+    yaml_payloads = [p.to_dict() for p in _loader.load_all()]
+    db_payloads = await get_all_payloads(category=None)
+    payload_map = {p["payload_id"]: p for p in yaml_payloads}
+    for p in db_payloads:
+        payload_map[p["payload_id"]] = p
+    payloads = list(payload_map.values())
+    if category:
+        payloads = [p for p in payloads if p.get("category") == category]
     return {"payloads": payloads, "total": len(payloads)}
 
 
 @router.get("/categories")
 async def list_categories():
     """获取载荷分类统计"""
-    cats = await get_payload_categories()
-
     loader = PayloadLoader()
     yaml_cats = loader.get_categories()
+    payload_map = {p.payload_id: p.to_dict() for p in loader.load_all()}
+    for payload in await get_all_payloads(category=None):
+        payload_map[payload["payload_id"]] = payload
+    counts = {}
+    for payload in payload_map.values():
+        cat_id = payload.get("category", "")
+        if cat_id:
+            counts[cat_id] = counts.get(cat_id, 0) + 1
 
     category_names = {
         "prompt_injection": "Prompt 注入攻击",
@@ -40,12 +54,11 @@ async def list_categories():
     }
 
     result = []
-    for c in cats:
-        cat_id = c["category"]
+    for cat_id, count in sorted(counts.items()):
         result.append({
             "category": cat_id,
             "name": category_names.get(cat_id, cat_id),
-            "count": c["count"],
+            "count": count,
             "cwe": yaml_cats.get(cat_id, {}).get("cwe", "") if yaml_cats else "",
         })
     return {"categories": result}
@@ -71,18 +84,27 @@ async def get_payload(payload_id: str):
 
 
 @router.post("")
-async def create_payload(payload: dict):
+async def create_payload(payload: PayloadCreate):
     """添加自定义载荷"""
-    existing = await get_payload_by_id(payload.get("payload_id", ""))
+    payload_data = payload.dict()
+    existing = await get_payload_by_id(payload_data["payload_id"])
     if existing:
         raise HTTPException(status_code=409, detail="载荷 ID 已存在")
-    pid = await save_payload(payload)
-    return {"id": pid, "payload_id": payload.get("payload_id")}
+
+    yaml_payload_ids = {item.payload_id for item in _loader.load_all()}
+    if payload_data["payload_id"] in yaml_payload_ids:
+        raise HTTPException(status_code=409, detail="载荷 ID 与内置载荷冲突，请使用新的自定义 ID")
+
+    pid = await save_payload(payload_data)
+    return {"id": pid, "payload_id": payload_data["payload_id"]}
 
 
 @router.delete("/{payload_id}")
 async def remove_payload(payload_id: str):
     """删除载荷"""
+    existing = await get_payload_by_id(payload_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail="载荷不存在")
     await delete_payload(payload_id)
     return {"deleted": True}
 
