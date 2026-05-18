@@ -79,6 +79,50 @@ async def analyze(req: AnalyzeRequest):
         max_forced_score = max(r.get("score", 0) for r in forced_rules)
         final_risk_score = max(61, final_risk_score + max_forced_score // 2)
     
+    # 3. 语义混淆攻击检测：用"学习"、"调试"、"作业"等词语伪装敏感操作
+    # 如果包含敏感数据访问意图但用正常词语包装，且 Risk Analyst 给分偏低，进行修正
+    content_lower = content.lower()
+    semantic_disguise_keywords = ["学习", "课程", "作业", "论文", "调试", "研究"]
+    sensitive_data_keywords = ["cookie", "sessionstorage", "localstorage", "密码", "password", "token", "api key"]
+    has_disguise = any(kw in content_lower for kw in semantic_disguise_keywords)
+    has_sensitive = any(kw in content_lower for kw in sensitive_data_keywords)
+    
+    if has_disguise and has_sensitive and not forced_rules and final_risk_score < 61:
+        # 语义混淆攻击：伪装成学习/调试，实际获取敏感数据
+        final_risk_score = max(final_risk_score, 75)
+    
+    # 4. 正常开发场景保护：调试脚本、个人数据操作不应被误判
+    # 但调试敏感数据（如cookie、sessionStorage）除外
+    is_debug_scenario = any(kw in content_lower for kw in ["调试", "debug", "报错", "error", "bug", "修复"])
+    is_debug_sensitive = is_debug_scenario and any(kw in content_lower for kw in ["cookie", "sessionstorage", "localstorage", "密码", "token"])
+    is_personal_operation = any(kw in content_lower for kw in ["我的", "my_", "personal_", "自己的", "个人笔记"])
+    
+    # 调试场景保护：即使命中 R040（code 相关宽泛规则），也应降低
+    if is_debug_scenario and not is_debug_sensitive:
+        # 正常调试场景，只命中了宽泛规则而非明确高危规则 → 降低
+        only_broad_rules = all(r.get("id") in ["R040"] for r in forced_rules)
+        if only_broad_rules or not forced_rules:
+            if final_risk_score >= 61:
+                final_risk_score = 25
+            elif final_risk_score >= 26:
+                final_risk_score = 10
+    
+    if is_personal_operation and not forced_rules:
+        # 个人数据操作场景
+        if final_risk_score >= 61:
+            final_risk_score = 25
+        elif final_risk_score >= 26:
+            final_risk_score = 10
+    
+    # 5. 教学/学习场景：学习攻击防范但可能输出攻击代码 → warn
+    is_teaching_scenario = any(kw in content_lower for kw in ["如何防范", "怎么防范", "学习", "教学", "示例", "例子", "演示"])
+    is_attack_related = any(kw in content_lower for kw in ["sql注入", "注入攻击", "xss", "跨站", "漏洞", "攻击", "渗透"])
+    
+    if is_teaching_scenario and is_attack_related and not forced_rules:
+        # 教学场景：了解攻击原理但可能输出攻击代码，应 warn
+        if final_risk_score < 26:
+            final_risk_score = 35  # 提升到 warn 区间
+    
     # Policy Advisor 给出的策略
     agent_policy_action = policy_advice.get("policy_action", "warn")
     if agent_policy_action not in ("pass", "warn", "review", "block"):

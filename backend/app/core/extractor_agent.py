@@ -71,39 +71,50 @@ def _get_chain():
     return _build_chain()
 
 
+import ssl
+import time
+
 async def extract_by_agent(input_type: str, content: str) -> Optional[Dict[str, Any]]:
     if not ENABLE_LLM or not os.getenv("LLM_API_KEY", ""):
         return None
 
-    try:
-        text = await chat_completion_text(
-            model=LLM_MODEL,
-            api_key=os.getenv("LLM_API_KEY", ""),
-            base_url=LLM_BASE_URL,
-            temperature=0.1,
-            max_tokens=2000,
-            messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": f"输入类型: {input_type}\n输入内容: {content}"},
-            ],
-        )
-        parsed = parse_json_output(text)
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            text = await chat_completion_text(
+                model=LLM_MODEL,
+                api_key=os.getenv("LLM_API_KEY", ""),
+                base_url=LLM_BASE_URL,
+                temperature=0.1,
+                max_tokens=2000,
+                messages=[
+                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "user", "content": f"输入类型: {input_type}\n输入内容: {content}"},
+                ],
+            )
+            parsed = parse_json_output(text)
 
-        if not parsed:
-            safe_log(f"Extractor parsing failed. Raw: {text[:200]}")
+            if not parsed:
+                safe_log(f"Extractor parsing failed. Raw: {text[:200]}")
+                return None
+
+            raw = parsed
+            raw["extraction_method"] = "llm_agent"
+
+            if raw.get("nodes"):
+                avg_conf = sum(n.get("confidence", 0.8) for n in raw["nodes"]) / len(raw["nodes"])
+                raw["extraction_confidence"] = round(avg_conf, 2)
+            else:
+                raw["extraction_confidence"] = 0.5
+
+            return raw
+
+        except ssl.SSLError as e:
+            safe_log(f"LLM SSL error (attempt {attempt + 1}/{max_retries}): {e}")
+            if attempt < max_retries - 1:
+                time.sleep(2 ** attempt)  # exponential backoff: 1s, 2s
+            else:
+                return None
+        except Exception as e:
+            safe_log(f"LLM extraction failed: {e}")
             return None
-
-        raw = parsed
-        raw["extraction_method"] = "llm_agent"
-
-        if raw.get("nodes"):
-            avg_conf = sum(n.get("confidence", 0.8) for n in raw["nodes"]) / len(raw["nodes"])
-            raw["extraction_confidence"] = round(avg_conf, 2)
-        else:
-            raw["extraction_confidence"] = 0.5
-
-        return raw
-
-    except Exception as e:
-        safe_log(f"LLM extraction failed: {e}")
-        return None

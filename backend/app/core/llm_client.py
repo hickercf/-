@@ -1,6 +1,9 @@
 import os
 import asyncio
 import httpx
+from dotenv import load_dotenv
+
+load_dotenv()
 
 
 LLM_TIMEOUT = float(os.getenv("LLM_TIMEOUT", "60"))
@@ -19,8 +22,8 @@ def build_chat_llm(*, model: str, api_key: str, base_url: str, temperature: floa
         temperature=temperature,
         max_tokens=max_tokens,
         request_timeout=timeout,
-        http_client=httpx.Client(timeout=timeout, trust_env=False),
-        http_async_client=httpx.AsyncClient(timeout=timeout, trust_env=False),
+        http_client=httpx.Client(timeout=timeout),
+        http_async_client=httpx.AsyncClient(timeout=timeout),
         http_socket_options=(),
     )
 

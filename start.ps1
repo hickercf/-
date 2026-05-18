@@ -4,7 +4,18 @@ if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
   throw 'Docker CLI not found. Please install and start Docker Desktop first.'
 }
 
-& docker compose up --build -d
+# 检查本地是否已有镜像，有则直接启动（避免网络问题导致构建失败）
+$backendImage = docker images -q agentfuzzer-backend:latest
+$frontendImage = docker images -q agentfuzzer-frontend:latest
+$sandboxImage = docker images -q agentfuzzer-sandbox:latest
+
+if ($backendImage -and $frontendImage -and $sandboxImage) {
+  "本地镜像已存在，直接启动..."
+  & docker compose up -d
+} else {
+  "本地镜像不存在，尝试构建..."
+  & docker compose up --build -d
+}
 
 Start-Sleep -Seconds 8
 

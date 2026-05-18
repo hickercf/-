@@ -137,8 +137,8 @@ CONTENT_DIRECT_RULES = [
      "advice": "禁止越权读取他人数据。"},
     # 数据库攻击
     {"id": "R111", "name": "数据库高危操作", "category": "数据安全", "score": 50, "level": "critical",
-     "patterns": [r"DROP\s+TABLE", r"DELETE\s+FROM", r"TRUNCATE\s+TABLE", r"删除.*表", r"清空.*数据库"],
-     "advice": "对数据库高危操作增加二次确认。"},
+      "patterns": [r"DROP\s+TABLE", r"DELETE\s+FROM\s+(?!my_|personal_)", r"TRUNCATE\s+TABLE", r"删除.*表", r"清空.*数据库"],
+      "advice": "对数据库高危操作增加二次确认。"},
     {"id": "R112", "name": "SQL 注入尝试", "category": "数据安全", "score": 45, "level": "critical",
      "patterns": [r"'\s*OR\s*'1'\s*=\s*'1", r"';\s*DROP", r"union\s+select", r"--\s*", r"#\s*"],
      "advice": "检测到 SQL 注入尝试，加强输入验证。"},

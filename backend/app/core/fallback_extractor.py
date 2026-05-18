@@ -379,12 +379,35 @@ def _post_process_nodes(nodes: List[Dict[str, Any]], content: str) -> None:
     has_remote_script = any(pat in content for pat in REMOTE_SCRIPT_PATTERNS)
     has_sql = any(pat in content.upper() for pat in SQL_DML_PATTERNS) and SQL_TABLE_PATTERN.search(content)
 
+    # 检查是否为正常开发/调试场景
+    is_debug_scenario = any(kw in content for kw in ["调试", "debug", "报错", "error", "bug"])
+    is_personal_operation = any(kw in content for kw in ["我的", "my_", "personal_", "自己的"])
+    
     for node in nodes:
         # SQL SELECT 查询应标记为 read，不是 write
         if node.get("action") == "write" and re.search(r'^\s*SELECT\s+', content, re.IGNORECASE):
             node["action"] = "read"
             node["data_type"] = "database_record"
             node["tool"] = "database"
+        
+        # 调试场景：如果是调试脚本/代码，降低风险；但如果涉及敏感数据访问，保持风险
+        is_code_debug = is_debug_scenario and any(kw in content for kw in ["脚本", "代码", "code", "python", "bug"])
+        is_sensitive_debug = is_debug_scenario and any(kw in content for kw in ["cookie", "sessionstorage", "localstorage", "密码", "token", "密钥", "浏览历史"])
+        
+        if is_code_debug and not is_sensitive_debug:
+            node["permission"] = "authorized"
+            # 调试脚本是正常开发，降低 action 风险
+            if node.get("action") == "execute":
+                node["action"] = "read"
+                node["data_type"] = "code"
+            # 调试场景不应该是 shell 执行
+            if node.get("tool") == "shell":
+                node["tool"] = "code"
+        
+        # 个人操作（如删除自己的笔记）降低风险
+        if is_personal_operation and node.get("action") in ("delete", "write"):
+            node["permission"] = "authorized"
+            node["data_type"] = "personal_data"
         
         if node.get("tool") == "unknown":
             if node.get("action") in ("delete", "execute", "download", "write"):

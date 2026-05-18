@@ -1,6 +1,6 @@
 from typing import Dict, Any, Optional
 from app.core.extractor_agent import extract_by_agent
-from app.core.fallback_extractor import extract_by_fallback
+from app.core.fallback_extractor import extract_by_fallback, _post_process_nodes
 
 
 def is_valid_chain(result: Optional[Dict[str, Any]]) -> bool:
@@ -115,6 +115,10 @@ async def extract_behavior_chain(input_type: str, content: str) -> Dict[str, Any
 
     result["input_type"] = input_type
     result["input_text"] = content
+    
+    # 再次运行后处理，确保调试场景等被正确处理
+    _post_process_nodes(result.get("nodes", []), content)
+    
     return result
 
 
