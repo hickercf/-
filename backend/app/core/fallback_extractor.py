@@ -13,7 +13,9 @@ ACTION_KEYWORDS: Dict[str, str] = {
     "编写": "write", "写": "write", "创建": "write", "新建": "write",
     "删除": "delete", "清空": "delete", "格式化": "delete", "移除": "delete",
     "DELETE": "delete", "DROP": "delete", "drop": "delete", "delete": "delete",
+    "TRUNCATE": "delete", "truncate": "delete",
     "执行": "execute", "运行": "execute", "跑": "execute",
+    "UPDATE": "write", "update": "write", "ALTER": "write", "alter": "write",
     "夺取": "execute", "提权": "execute", "escalat": "execute",
     "exploit": "execute", "攻击": "execute", "渗透": "execute",
     "下载": "download", "拉取": "download", "安装": "download",
@@ -94,6 +96,8 @@ PERMISSION_KEYWORDS: Dict[str, str] = {
     "root": "unauthorized", "sudo": "unauthorized", "提权": "unauthorized",
     "夺取": "unauthorized", "escalat": "unauthorized", "横向": "unauthorized",
     "越权": "unauthorized", "未授权": "unauthorized", "非法": "unauthorized",
+    "role=admin": "unauthorized", "设为管理员": "unauthorized", "提升权限": "unauthorized",
+    "admin": "unauthorized", "管理员": "unauthorized",
 }
 
 DESTINATION_KEYWORDS: Dict[str, str] = {
@@ -376,11 +380,17 @@ def _post_process_nodes(nodes: List[Dict[str, Any]], content: str) -> None:
     has_sql = any(pat in content.upper() for pat in SQL_DML_PATTERNS) and SQL_TABLE_PATTERN.search(content)
 
     for node in nodes:
+        # SQL SELECT 查询应标记为 read，不是 write
+        if node.get("action") == "write" and re.search(r'^\s*SELECT\s+', content, re.IGNORECASE):
+            node["action"] = "read"
+            node["data_type"] = "database_record"
+            node["tool"] = "database"
+        
         if node.get("tool") == "unknown":
-            if node.get("action") in ("delete", "execute", "download"):
+            if node.get("action") in ("delete", "execute", "download", "write"):
                 if has_shell_cmd:
                     node["tool"] = "shell"
-                elif has_sql and node.get("action") == "delete":
+                elif has_sql and node.get("action") in ("delete", "write"):
                     node["tool"] = "database"
                 elif node.get("action") == "delete" and (has_system_file or has_dangerous_delete):
                     node["tool"] = "file"
@@ -397,7 +407,7 @@ def _post_process_nodes(nodes: List[Dict[str, Any]], content: str) -> None:
                     node["tool"] = "email"
 
         if node.get("data_type") == "unknown":
-            if node.get("action") == "delete" and has_sql:
+            if node.get("action") in ("delete", "write") and has_sql:
                 node["data_type"] = "database_record"
             elif node.get("action") == "delete" and (has_system_file or has_dangerous_delete):
                 node["data_type"] = "system_file"
@@ -416,6 +426,15 @@ def _post_process_nodes(nodes: List[Dict[str, Any]], content: str) -> None:
                     node["data_type"] = "personal_info"
                 elif "数据库" in content or "SQL" in content.upper():
                     node["data_type"] = "database_record"
+
+    # 检测 SQL 权限提升（UPDATE admin/role）
+    has_admin_escalation = any(kw in content.lower() for kw in ("role=admin", "admin", "管理员", "root", "权限"))
+    if has_sql and has_admin_escalation and any(n.get("action") == "write" for n in nodes):
+        for node in nodes:
+            if node.get("action") == "write" and node.get("permission") == "unknown":
+                node["permission"] = "unauthorized"
+            if node.get("action") == "write" and node.get("tool") == "unknown":
+                node["tool"] = "database"
 
     has_unauthorized = any(n.get("permission") == "unauthorized" for n in nodes)
     if has_unauthorized:

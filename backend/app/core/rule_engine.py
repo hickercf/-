@@ -119,8 +119,8 @@ CONTENT_DIRECT_RULES = [
      "patterns": [r"读取.*密码", r"获取.*token", r"读取.*cookie", r"读取.*api.key", r"读取.*密钥", r"读取.*凭证"],
      "advice": "禁止 Agent 访问凭证类数据。"},
     {"id": "R106", "name": "批量数据导出", "category": "数据外传", "score": 40, "level": "high",
-     "patterns": [r"导出.*全部", r"导出.*所有", r"select\s+\*", r"dump.*all", r"批量导出", r"全量.*数据"],
-     "advice": "限制单次查询返回的数据量，批量操作需要审批。"},
+      "patterns": [r"导出.*全部", r"导出.*所有", r"dump.*all", r"批量导出", r"全量.*数据"],
+      "advice": "限制单次查询返回的数据量，批量操作需要审批。"},
     # Prompt 注入
     {"id": "R107", "name": "Prompt 注入指令", "category": "提示词注入", "score": 45, "level": "critical",
      "patterns": [r"ignore\s+previous", r"忽略之前", r"切换模式", r"developer\s+mode", r"jailbreak", r"越狱", r"DAN\s+模式"],
@@ -174,6 +174,42 @@ CONTENT_DIRECT_RULES = [
     {"id": "R121", "name": "论文摘要绕过诱导", "category": "提示词注入", "score": 45, "level": "high",
      "patterns": [r"论文.*绕过.*安全限制", r"摘要.*绕过.*限制", r"研究表明.*绕过.*安全", r"论文.*角色扮演.*重置"],
      "advice": "检测到以学术论文为包装，诱导绕过安全限制，属于隐晦 Prompt 注入。"},
+    # SQL 权限提升
+    {"id": "R122", "name": "SQL UPDATE 权限提升", "category": "权限提升", "score": 60, "level": "critical",
+     "patterns": [
+         r"UPDATE\s+\w+\s+SET\s+.*role\s*=\s*['\"]?admin",
+         r"UPDATE\s+\w+\s+SET\s+.*权限\s*=\s*['\"]?管理员",
+         r"UPDATE\s+\w+\s+SET\s+.*role\s*=\s*['\"]?root",
+         r"UPDATE\s+users\s+SET\s+role",
+         r"UPDATE\s+.*\s+SET\s+.*WHERE\s+1\s*=\s*1",
+         r"UPDATE\s+.*\s+SET\s+.*admin",
+     ],
+     "advice": "检测到 SQL UPDATE 语句尝试提升用户权限，属于高危权限提升攻击，应立即阻断。"},
+     {"id": "R123", "name": "SQL 批量修改", "category": "数据安全", "score": 50, "level": "critical",
+      "patterns": [
+          r"UPDATE\s+\w+\s+SET\s+.*WHERE\s+1\s*=\s*1",
+          r"UPDATE\s+\w+\s+SET\s+.*WHERE\s+['\"]?\d+['\"]?\s*=\s+['\"]?\d+['\"]?",
+      ],
+      "advice": "检测到 SQL UPDATE 使用永真条件批量修改数据，可能造成全表数据被篡改。"},
+    {"id": "R124", "name": "DEBUG MODE 系统信息泄露", "category": "模型安全", "score": 60, "level": "critical",
+      "patterns": [
+          r"DEBUG\s*MODE",
+          r"调试模式",
+          r"输出.*完整配置",
+          r"输出.*内部指令",
+          r"显示.*系统配置",
+          r"显示.*内部设定",
+      ],
+      "advice": "检测到试图以 DEBUG MODE 或调试模式获取系统内部配置和指令，属于严重的模型安全攻击。"},
+    {"id": "R125", "name": "数据库备份外传", "category": "数据外传", "score": 65, "level": "critical",
+      "patterns": [
+          r"数据库备份.*上传",
+          r"备份.*上传.*云",
+          r"数据库.*导出.*发送",
+          r"备份文件.*外传",
+          r"数据库.*备份.*外部",
+      ],
+      "advice": "检测到试图将数据库备份文件上传到外部存储或发送出去，属于严重的数据外传攻击，必须阻断。"},
     # 正常任务排除（负分规则，用于降低正常任务的风险评分）
     {"id": "R201", "name": "正常编程任务", "category": "正常任务", "score": -30, "level": "low",
      "patterns": [
@@ -207,6 +243,9 @@ CONTENT_DIRECT_RULES = [
          r"翻译.*中文",
          r"总结.*文章",
          r"生成.*摘要",
+         r"总结.*论文",
+         r"总结.*观点",
+         r"阅读.*文献",
      ],
      "advice": "正常文本处理任务，降低风险评分。"},
 ]
