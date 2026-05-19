@@ -82,7 +82,6 @@ def is_safe_callback_url(url: str) -> tuple:
         r"^10\.",
         r"^192\.168\.",
         r"^172\.(1[6-9]|2[0-9]|3[01])\.",
-        r"\.internal$",
         r"\.local$",
         r"metadata\.google\.internal",
         r"^ip-10-",

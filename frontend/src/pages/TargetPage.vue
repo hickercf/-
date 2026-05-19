@@ -87,11 +87,20 @@
         </div>
         <div class="card-actions">
           <button class="btn-sm btn-primary" @click="startScan(t)" :disabled="scanningTarget === t.target_id">
-            {{ scanningTarget === t.target_id ? '启动中...' : '开始扫描' }}
+            {{ scanningTarget === t.target_id ? 'Running...' : (t.access_mode === 'sandbox' ? 'Poison Test' : 'Start Scan') }}
           </button>
-          <button class="btn-sm" @click="viewDetail(t)">详情</button>
-          <button class="btn-sm" @click="editTarget(t)">编辑</button>
-          <button class="btn-sm btn-danger" @click="removeTarget(t)">删除</button>
+          <button class="btn-sm" @click="viewDetail(t)">Detail</button>
+          <button class="btn-sm" @click="editTarget(t)">Edit</button>
+          <button class="btn-sm btn-danger" @click="removeTarget(t)">Delete</button>
+        </div>
+        <!-- Poison Results -->
+        <div v-if="poisonResults[t.target_id]" class="poison-results">
+          <div class="poison-stats">
+            <span class="stat success">{{ poisonResults[t.target_id].attack_success_count }} hit</span>
+            <span class="stat defended">{{ poisonResults[t.target_id].defense_success_count }} defended</span>
+            <span class="stat rate">{{ poisonResults[t.target_id].attack_success_rate }}%</span>
+            <button class="btn-sm" @click="showPoisonDetail(t.target_id)">Details</button>
+          </div>
         </div>
       </div>
     </div>
@@ -99,44 +108,92 @@
     <!-- 靶标详情弹窗 -->
     <div v-if="detailTarget" class="modal-overlay" @click.self="detailTarget = null">
       <div class="modal detail-modal">
-        <h3>{{ detailTarget.name }} — 攻击面分析</h3>
+        <h3>{{ detailTarget.name }} — Attack Surface</h3>
         <div v-if="detailTarget.attack_surface">
           <div class="section">
-            <h4>可绕过约束 ({{ detailTarget.attack_surface.constraints_to_bypass?.length || 0 }})</h4>
+            <h4>Bypassable Constraints ({{ detailTarget.attack_surface.constraints_to_bypass?.length || 0 }})</h4>
             <ul>
               <li v-for="c in detailTarget.attack_surface.constraints_to_bypass" :key="c">{{ c }}</li>
             </ul>
           </div>
           <div class="section">
-            <h4>高价值 API ({{ detailTarget.attack_surface.high_value_apis?.length || 0 }})</h4>
+            <h4>High Value APIs ({{ detailTarget.attack_surface.high_value_apis?.length || 0 }})</h4>
             <div class="tags">
               <span v-for="a in detailTarget.attack_surface.high_value_apis" :key="a" class="tag tag-danger">{{ a }}</span>
             </div>
           </div>
           <div class="section">
-            <h4>敏感参数 ({{ detailTarget.attack_surface.sensitive_params?.length || 0 }})</h4>
+            <h4>Sensitive Params ({{ detailTarget.attack_surface.sensitive_params?.length || 0 }})</h4>
             <div class="tags">
               <span v-for="p in detailTarget.attack_surface.sensitive_params" :key="p" class="tag tag-warning">{{ p }}</span>
             </div>
           </div>
           <div class="section">
-            <h4>弱 Prompt 模式</h4>
+            <h4>Weak Prompt Patterns</h4>
             <ul>
               <li v-for="w in detailTarget.attack_surface.weak_prompt_patterns" :key="w">{{ w }}</li>
             </ul>
           </div>
           <div class="section">
-            <h4>综合暴露等级: <span :class="'exposure-text ' + detailTarget.attack_surface.overall_exposure">{{ detailTarget.attack_surface.overall_exposure.toUpperCase() }}</span></h4>
+            <h4>Exposure: <span :class="'exposure-text ' + detailTarget.attack_surface.overall_exposure">{{ detailTarget.attack_surface.overall_exposure.toUpperCase() }}</span></h4>
           </div>
         </div>
-        <button class="btn-secondary" @click="detailTarget = null">关闭</button>
+        <button class="btn-secondary" @click="detailTarget = null">Close</button>
+      </div>
+    </div>
+
+    <!-- 投毒结果详情弹窗 -->
+    <div v-if="poisonDetailId" class="modal-overlay" @click.self="poisonDetailId = null">
+      <div class="modal poison-modal">
+        <h3>Poison Test Results</h3>
+        <div v-if="poisonResults[poisonDetailId]" class="poison-detail-stats">
+          <span class="stat-item">Total: {{ poisonResults[poisonDetailId].total }}</span>
+          <span class="stat-item hit">Attack Success: {{ poisonResults[poisonDetailId].attack_success_count }}</span>
+          <span class="stat-item def">Defended: {{ poisonResults[poisonDetailId].defense_success_count }}</span>
+          <span class="stat-item rate">Rate: {{ poisonResults[poisonDetailId].attack_success_rate }}%</span>
+        </div>
+        <div class="filter-bar">
+          <button :class="['filter-btn', { active: poisonFilter === 'all' }]" @click="poisonFilter = 'all'">All</button>
+          <button :class="['filter-btn', { active: poisonFilter === 'success' }]" @click="poisonFilter = 'success'">Attack Success</button>
+          <button :class="['filter-btn', { active: poisonFilter === 'failed' }]" @click="poisonFilter = 'failed'">Defended</button>
+        </div>
+        <div class="poison-list">
+          <div
+            v-for="r in filteredPoisonResults"
+            :key="r.case_id"
+            :class="['poison-item', r.severity, { expanded: expandedCase === r.case_id }]"
+            @click="expandedCase = expandedCase === r.case_id ? null : r.case_id"
+          >
+            <div class="poison-item-header">
+              <span :class="['result-badge', r.attack_success ? 'hit' : 'def']">{{ r.attack_success ? 'HIT' : 'DEF' }}</span>
+              <span class="case-id">{{ r.case_id }}</span>
+              <span class="case-summary">{{ r.summary }}</span>
+              <span class="case-time">{{ r.elapsed_ms }}ms</span>
+            </div>
+            <div v-if="expandedCase === r.case_id" class="poison-item-detail">
+              <div class="detail-block">
+                <b>Input:</b>
+                <pre>{{ r.input_text }}</pre>
+              </div>
+              <div class="detail-block">
+                <b>Agent Response:</b>
+                <pre>{{ r.agent_output || '(no output)' }}</pre>
+              </div>
+              <div v-if="r.evidence" class="detail-block">
+                <b>Evidence:</b>
+                <pre>{{ r.evidence }}</pre>
+              </div>
+            </div>
+          </div>
+        </div>
+        <button class="btn-secondary" @click="poisonDetailId = null">Close</button>
       </div>
     </div>
   </div>
 </template>
 
 <script>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { getTargets, getTargetDetail, createTarget, updateTarget, deleteTarget, startTargetScan } from '../api/request.js'
 
 export default {
@@ -148,6 +205,10 @@ export default {
     const editingTarget = ref(null)
     const detailTarget = ref(null)
     const scanningTarget = ref(null)
+    const poisonResults = ref({})
+    const poisonDetailId = ref(null)
+    const poisonFilter = ref('all')
+    const expandedCase = ref(null)
 
     const form = reactive({
       name: '',
@@ -229,14 +290,35 @@ export default {
     const startScan = async (t) => {
       scanningTarget.value = t.target_id
       try {
-        const result = await startTargetScan(t.target_id, { scan_mode: 'standard' })
-        alert(`扫描已启动！扫描ID: ${result.scan_id}`)
+        const config = t.access_mode === 'sandbox'
+          ? { scan_mode: 'standard', dataset: 'all', max_cases: 20, concurrency: 3 }
+          : { scan_mode: 'standard' }
+        const result = await startTargetScan(t.target_id, config)
+        if (t.access_mode === 'sandbox' && result.results) {
+          poisonResults.value[t.target_id] = result
+        } else {
+          alert('Scan started! ID: ' + result.scan_id)
+        }
       } catch (e) {
-        alert('启动扫描失败: ' + (e.response?.data?.detail || e.message))
+        alert('Scan failed: ' + (e.response?.data?.detail || e.message))
       } finally {
         scanningTarget.value = null
       }
     }
+
+    const showPoisonDetail = (targetId) => {
+      poisonDetailId.value = targetId
+      poisonFilter.value = 'all'
+      expandedCase.value = null
+    }
+
+    const filteredPoisonResults = computed(() => {
+      const data = poisonResults.value[poisonDetailId.value]
+      if (!data) return []
+      if (poisonFilter.value === 'success') return data.results.filter(r => r.attack_success)
+      if (poisonFilter.value === 'failed') return data.results.filter(r => !r.attack_success)
+      return data.results
+    })
 
     const modeLabel = (m) => ({ callback: 'HTTP回调', log: '日志模式', sandbox: '沙箱' }[m] || m)
 
@@ -245,6 +327,7 @@ export default {
     return {
       targets, loading, showForm, editingTarget, detailTarget, scanningTarget,
       form, closeForm, submitTarget, editTarget, viewDetail, removeTarget, startScan, modeLabel,
+      poisonResults, poisonDetailId, poisonFilter, expandedCase, showPoisonDetail, filteredPoisonResults,
     }
   }
 }
@@ -303,4 +386,40 @@ export default {
 .btn-sm { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; }
 .btn-danger { color: #dc2626; border-color: #fecaca; }
 .loading, .empty { text-align: center; padding: 60px; color: #94a3b8; }
+
+.poison-results { padding: 8px 16px; border-top: 1px solid #e2e8f0; background: #f8fafc; }
+.poison-stats { display: flex; gap: 12px; align-items: center; font-size: 12px; }
+.poison-stats .stat { font-weight: 600; }
+.poison-stats .stat.success { color: #dc2626; }
+.poison-stats .stat.defended { color: #059669; }
+.poison-stats .stat.rate { color: #d97706; }
+
+.poison-modal { width: 900px; max-height: 85vh; }
+.poison-detail-stats { display: flex; gap: 16px; margin-bottom: 12px; font-size: 14px; font-weight: 600; }
+.stat-item.hit { color: #dc2626; }
+.stat-item.def { color: #059669; }
+.stat-item.rate { color: #d97706; }
+
+.filter-bar { display: flex; gap: 6px; margin-bottom: 12px; }
+.filter-btn { background: #f1f5f9; border: 1px solid #cbd5e1; padding: 4px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; color: #64748b; }
+.filter-btn.active { background: #334155; color: #fff; border-color: #334155; }
+
+.poison-list { display: flex; flex-direction: column; gap: 4px; max-height: 55vh; overflow-y: auto; }
+.poison-item { border-radius: 4px; cursor: pointer; border-left: 3px solid #cbd5e1; background: #f8fafc; }
+.poison-item.critical { border-left-color: #dc2626; }
+.poison-item.high { border-left-color: #ea580c; }
+.poison-item.medium { border-left-color: #d97706; }
+.poison-item.safe { border-left-color: #059669; }
+.poison-item.error { border-left-color: #94a3b8; }
+.poison-item-header { display: flex; gap: 8px; align-items: center; padding: 8px 12px; font-size: 12px; }
+.poison-item-header .case-id { color: #64748b; font-family: monospace; min-width: 45px; }
+.poison-item-header .case-summary { flex: 1; color: #334155; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.poison-item-header .case-time { color: #94a3b8; font-family: monospace; }
+.poison-item-header .result-badge { font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 3px; }
+.poison-item-header .result-badge.hit { background: #fee2e2; color: #dc2626; }
+.poison-item-header .result-badge.def { background: #d1fae5; color: #059669; }
+.poison-item-detail { border-top: 1px solid #e2e8f0; padding: 10px 12px; background: #fff; }
+.poison-item-detail .detail-block { margin-bottom: 8px; }
+.poison-item-detail .detail-block b { font-size: 11px; color: #64748b; }
+.poison-item-detail .detail-block pre { background: #f1f5f9; padding: 8px; border-radius: 4px; font-size: 11px; white-space: pre-wrap; word-break: break-all; margin: 4px 0 0; max-height: 120px; overflow-y: auto; color: #334155; }
 </style>

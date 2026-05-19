@@ -97,7 +97,8 @@ export async function deleteTarget(targetId) {
 }
 
 export async function startTargetScan(targetId, config = {}) {
-  const res = await api.post(`/targets/${targetId}/scan`, config)
+  const timeout = config.dataset ? 3600000 : 120000
+  const res = await api.post(`/targets/${targetId}/scan`, config, { timeout })
   return res.data
 }
 
@@ -193,3 +194,23 @@ export async function getRecord(id) {
 }
 
 export default api
+
+// ── 投毒测试 API ──
+
+export async function getPoisonDatasets() {
+  const res = await api.get('/poison/datasets')
+  return res.data
+}
+
+export async function startPoisonTest(dataset = 'all', maxCases = 0, concurrency = 3) {
+  const res = await api.post('/poison/start', null, {
+    params: { dataset, max_cases: maxCases, concurrency },
+    timeout: 600000,
+  })
+  return res.data
+}
+
+export async function poisonTestSingle(inputText) {
+  const res = await api.post('/poison/single', { input_text: inputText })
+  return res.data
+}

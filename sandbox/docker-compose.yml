@@ -11,6 +11,11 @@ services:
     environment:
       - SANDBOX_MODE=true
       - PYTHONUNBUFFERED=1
+      - LLM_API_KEY=${LLM_API_KEY:-}
+      - LLM_BASE_URL=${LLM_BASE_URL:-https://open.bigmodel.cn/api/paas/v4}
+      - LLM_MODEL=${LLM_MODEL:-glm-4-flash}
+      - LLM_TIMEOUT=${LLM_TIMEOUT:-90}
+      - LLM_CONNECT_TIMEOUT=${LLM_CONNECT_TIMEOUT:-45}
     read_only: false
     mem_limit: 512m
     cpus: "1.0"

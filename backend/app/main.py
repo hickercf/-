@@ -6,7 +6,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 import time
 from app.database.db import init_db, mark_incomplete_scans_failed
 from app.api import analyze_api, history_api, stats_api, report_api, eval_api
-from app.api import target_api, scan_api, payload_api, sandbox_api
+from app.api import target_api, scan_api, payload_api, sandbox_api, poison_api
 
 
 @asynccontextmanager
@@ -107,6 +107,7 @@ app.include_router(target_api.router)
 app.include_router(scan_api.router)
 app.include_router(payload_api.router)
 app.include_router(sandbox_api.router)
+app.include_router(poison_api.router)
 
 
 @app.get("/")

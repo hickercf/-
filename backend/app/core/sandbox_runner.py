@@ -30,15 +30,17 @@ class SandboxRunner:
 
         if isinstance(data, dict) and data.get("events") and not data.get("steps"):
             steps = []
-            for event in data.get("events", []):
+            for idx, event in enumerate(data.get("events", [])):
                 event_type = event.get("event_type")
                 evidence = event.get("evidence", "")
                 if event_type == "plan":
-                    steps.append({"type": "thought", "content": evidence})
+                    steps.append({"step_index": idx, "type": "thought", "thought": evidence, "content": evidence})
                 elif event_type in ("tool_select", "tool_call", "policy"):
                     steps.append({
+                        "step_index": idx,
                         "type": "action",
                         "content": event.get("tool") or event.get("action") or evidence,
+                        "action": event.get("tool") or event.get("action") or evidence,
                         "action_input": {
                             "object": event.get("object"),
                             "permission": event.get("permission"),
@@ -46,7 +48,9 @@ class SandboxRunner:
                         },
                     })
                 elif event_type in ("observation", "data_flow", "output"):
-                    steps.append({"type": "observation", "content": evidence})
+                    steps.append({"step_index": idx, "type": "observation", "observation": evidence, "content": evidence})
+                elif event_type == "message":
+                    steps.append({"step_index": idx, "type": "thought", "thought": evidence, "content": evidence})
             data["steps"] = steps
 
         if isinstance(data, dict):

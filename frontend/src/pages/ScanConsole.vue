@@ -3,7 +3,10 @@
     <div class="page-header">
       <h2>扫描控制台</h2>
       <div class="header-actions">
-        <label for="scan-target-select" class="sr-only">选择靶标 Agent</label>
+        <div class="mode-tabs">
+          <button :class="['mode-tab', { active: pageMode === 'payload' }]" @click="pageMode = 'payload'">Payload 扫描</button>
+          <button :class="['mode-tab', { active: pageMode === 'poison' }]" @click="pageMode = 'poison'">投毒测试</button>
+        </div>
         <select id="scan-target-select" v-model="selectedTarget" class="target-select">
           <option value="">-- 选择靶标 Agent --</option>
           <option v-for="t in targets" :key="t.target_id" :value="t.target_id">{{ t.name }}</option>
@@ -13,8 +16,11 @@
     <div v-if="errorMessage" class="error-banner">{{ errorMessage }}</div>
 
     <div class="scan-layout">
-      <!-- 左侧: 扫描配置 -->
+      <!-- 左侧: 配置 -->
       <div class="config-panel">
+
+        <!-- ====== Payload 扫描模式 ====== -->
+        <template v-if="pageMode === 'payload'">
         <div class="card">
           <h3>扫描配置</h3>
           <div class="form-group">
@@ -60,6 +66,46 @@
             <button v-if="['running','paused','pending'].includes(activeScan.status)" class="btn-sm btn-danger" @click="cancelCurrentScan">取消</button>
           </div>
         </div>
+        </template>
+
+        <!-- ====== 投毒测试模式 ====== -->
+        <template v-if="pageMode === 'poison'">
+        <div class="card">
+          <h3>投毒配置</h3>
+          <div class="form-group">
+            <label>数据集</label>
+            <select v-model="poisonConfig.dataset" :disabled="poisonRunning">
+              <option value="all">全部 (180条)</option>
+              <option value="test_cases">基础测试 (30条)</option>
+              <option value="prompt_attacks">Prompt攻击 (100条)</option>
+              <option value="adversarial">对抗样本 (50条)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>最大用例数 (0=全部)</label>
+            <input type="number" v-model.number="poisonConfig.max_cases" min="0" :disabled="poisonRunning" />
+          </div>
+          <div class="form-group">
+            <label>并发数</label>
+            <input type="number" v-model.number="poisonConfig.concurrency" min="1" max="10" :disabled="poisonRunning" />
+          </div>
+          <button class="btn-primary btn-block" @click="startPoisonTest" :disabled="!selectedTarget || poisonRunning">
+            {{ poisonRunning ? `测试中... (${poisonProgress.done}/${poisonProgress.total})` : '开始投毒测试' }}
+          </button>
+          <button v-if="poisonRunning" class="btn-secondary btn-block" style="margin-top:6px" @click="poisonRunning = false">停止</button>
+        </div>
+
+        <!-- 投毒结果统计 -->
+        <div v-if="poisonResults.length > 0" class="card">
+          <h3>投毒统计</h3>
+          <div class="poison-stats-grid">
+            <div class="poison-stat"><span class="poison-num">{{ poisonReport.total }}</span><span class="poison-label">总用例</span></div>
+            <div class="poison-stat hit"><span class="poison-num">{{ poisonReport.attack_success_count }}</span><span class="poison-label">攻击成功</span></div>
+            <div class="poison-stat def"><span class="poison-num">{{ poisonReport.defense_success_count }}</span><span class="poison-label">防御成功</span></div>
+            <div class="poison-stat rate"><span class="poison-num">{{ poisonReport.attack_success_rate }}%</span><span class="poison-label">攻击成功率</span></div>
+          </div>
+        </div>
+        </template>
 
         <!-- 自定义 Payload -->
         <div class="card">
@@ -98,8 +144,11 @@
         </div>
       </div>
 
-      <!-- 右侧: 扫描进度 + 结果 -->
+      <!-- 右侧: 结果 -->
       <div class="result-panel">
+
+        <!-- ====== Payload 扫描结果 ====== -->
+        <template v-if="pageMode === 'payload'">
         <!-- 扫描进度 -->
         <div v-if="activeScan" class="card">
           <h3>扫描进度 — {{ activeScan.scan_id }}</h3>
@@ -155,6 +204,49 @@
           </table>
           <p v-else class="empty-text">暂无扫描记录</p>
         </div>
+        </template>
+
+        <!-- ====== 投毒测试结果 ====== -->
+        <template v-if="pageMode === 'poison'">
+        <!-- 过滤 -->
+        <div v-if="poisonResults.length > 0" class="filter-bar">
+          <button :class="['filter-btn', { active: poisonFilter === 'all' }]" @click="poisonFilter = 'all'">全部 ({{ poisonResults.length }})</button>
+          <button :class="['filter-btn', { active: poisonFilter === 'success' }]" @click="poisonFilter = 'success'">攻击成功 ({{ poisonResults.filter(r => r.attack_success).length }})</button>
+          <button :class="['filter-btn', { active: poisonFilter === 'failed' }]" @click="poisonFilter = 'failed'">防御成功 ({{ poisonResults.filter(r => !r.attack_success).length }})</button>
+        </div>
+
+        <!-- 投毒结果列表 -->
+        <div v-if="filteredPoisonResults.length > 0" class="card">
+          <div class="poison-list">
+            <div
+              v-for="r in filteredPoisonResults"
+              :key="r.case_id"
+              :class="['poison-result-item', r.severity, { expanded: expandedCase === r.case_id }]"
+              @click="expandedCase = expandedCase === r.case_id ? null : r.case_id"
+            >
+              <div class="poison-result-header">
+                <span :class="['poison-badge', r.attack_success ? 'hit' : 'def']">{{ r.attack_success ? '攻击成功' : '防御成功' }}</span>
+                <span class="poison-case-id">{{ r.case_id }}</span>
+                <span class="poison-case-summary">{{ r.summary }}</span>
+                <span class="poison-case-time">{{ r.elapsed_ms }}ms</span>
+              </div>
+              <div v-if="expandedCase === r.case_id" class="poison-result-detail">
+                <div class="detail-block"><b>攻击输入:</b><pre>{{ r.input_text }}</pre></div>
+                <div class="detail-block"><b>Agent 响应:</b><pre>{{ r.agent_output || '(无输出)' }}</pre></div>
+                <div v-if="r.evidence" class="detail-block"><b>判定证据:</b><pre>{{ r.evidence }}</pre></div>
+                <div class="detail-meta"><span>类型: {{ r.attack_type || '-' }}</span><span>严重度: {{ r.severity }}</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 空状态 -->
+        <div v-if="!poisonRunning && poisonResults.length === 0" class="card">
+          <p class="empty-text">选择靶标 Agent，然后点击"开始投毒测试"</p>
+          <p class="empty-text" style="font-size:12px;color:#cbd5e1">请确保沙箱 Agent 已启动 (端口 18080)</p>
+        </div>
+        </template>
+
       </div>
     </div>
 
@@ -200,7 +292,7 @@
 
 <script>
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
-import { getTargets, getScans, getScanDetail, startTargetScan, pauseScan, resumeScan, cancelScan, createPayload } from '../api/request.js'
+import { getTargets, getScans, getScanDetail, startTargetScan, pauseScan, resumeScan, cancelScan, createPayload, startPoisonTest } from '../api/request.js'
 
 export default {
   name: 'ScanConsole',
@@ -213,6 +305,14 @@ export default {
     const scanDetail = ref(null)
     const latestResults = ref([])
     const errorMessage = ref('')
+    const pageMode = ref('poison')
+    const poisonRunning = ref(false)
+    const poisonResults = ref([])
+    const poisonFilter = ref('all')
+    const expandedCase = ref(null)
+    const poisonProgress = reactive({ done: 0, total: 0 })
+    const poisonReport = reactive({ total: 0, attack_success_count: 0, defense_success_count: 0, attack_success_rate: 0 })
+    const poisonConfig = reactive({ dataset: 'all', max_cases: 20, concurrency: 3 })
     let ws = null
     let pollTimer = null
 
@@ -394,6 +494,41 @@ export default {
     const resultStatusClass = (r) => r?.react_trace?.error ? 'error' : (r?.vulnerability_severity || 'safe')
     const resultStatusLabel = (r) => r?.react_trace?.error ? '执行失败' : (r?.vulnerability_severity || '安全')
 
+    const filteredPoisonResults = computed(() => {
+      if (poisonFilter.value === 'success') return poisonResults.value.filter(r => r.attack_success)
+      if (poisonFilter.value === 'failed') return poisonResults.value.filter(r => !r.attack_success)
+      return poisonResults.value
+    })
+
+    const startPoisonTest = async () => {
+      if (!selectedTarget.value) return
+      poisonRunning.value = true
+      poisonResults.value = []
+      expandedCase.value = null
+      poisonProgress.done = 0
+      poisonProgress.total = 0
+      errorMessage.value = ''
+      try {
+        const data = await startTargetScan(selectedTarget.value, {
+          scan_mode: 'standard',
+          dataset: poisonConfig.dataset,
+          max_cases: poisonConfig.max_cases,
+          concurrency: poisonConfig.concurrency,
+        })
+        poisonResults.value = data.results || []
+        poisonReport.total = data.total
+        poisonReport.attack_success_count = data.attack_success_count
+        poisonReport.defense_success_count = data.defense_success_count
+        poisonReport.attack_success_rate = data.attack_success_rate
+        poisonProgress.done = data.total
+        poisonProgress.total = data.total
+      } catch (e) {
+        errorMessage.value = '投毒测试失败: ' + (e.response?.data?.detail || e.message)
+      } finally {
+        poisonRunning.value = false
+      }
+    }
+
     onMounted(async () => {
       await loadTargets()
       await restoreActiveScan()
@@ -405,6 +540,8 @@ export default {
       config, scanModes, categories, commonMutations, progressPct,
       customPayload, createCustomPayload,
       startNewScan, pauseCurrentScan, resumeCurrentScan, cancelCurrentScan, viewScanDetail, statusLabel, resultStatusClass, resultStatusLabel,
+      pageMode, poisonRunning, poisonResults, poisonFilter, expandedCase, poisonProgress, poisonReport, poisonConfig,
+      filteredPoisonResults, startPoisonTest,
     }
   }
 }
@@ -502,4 +639,42 @@ export default {
 .empty-text { text-align: center; color: #94a3b8; padding: 20px; }
 .form-group textarea { width: 100%; padding: 7px 10px; border: 1px solid #cbd5e1; border-radius: 5px; font-size: 13px; resize: vertical; }
 .form-group select { width: 100%; padding: 7px 10px; border: 1px solid #cbd5e1; border-radius: 5px; font-size: 13px; background: white; }
+
+/* Mode tabs */
+.mode-tabs { display: flex; gap: 4px; }
+.mode-tab { padding: 6px 14px; border: 1px solid #cbd5e1; border-radius: 6px; background: #f8fafc; cursor: pointer; font-size: 13px; color: #475569; }
+.mode-tab.active { background: #3b82f6; color: #fff; border-color: #3b82f6; }
+
+/* Poison stats */
+.poison-stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.poison-stat { text-align: center; padding: 10px; border-radius: 6px; background: #f8fafc; }
+.poison-stat .poison-num { display: block; font-size: 22px; font-weight: 700; }
+.poison-stat .poison-label { font-size: 11px; color: #64748b; }
+.poison-stat.hit .poison-num { color: #ef4444; }
+.poison-stat.def .poison-num { color: #22c55e; }
+.poison-stat.rate .poison-num { color: #f59e0b; }
+
+/* Filter bar */
+.filter-bar { display: flex; gap: 8px; margin-bottom: 12px; }
+.filter-btn { padding: 5px 12px; border: 1px solid #cbd5e1; border-radius: 5px; background: #f8fafc; cursor: pointer; font-size: 12px; color: #475569; }
+.filter-btn.active { background: #3b82f6; color: #fff; border-color: #3b82f6; }
+
+/* Poison result items */
+.poison-list { display: flex; flex-direction: column; gap: 6px; }
+.poison-result-item { border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px 12px; cursor: pointer; transition: all 0.15s; }
+.poison-result-item:hover { box-shadow: 0 2px 6px rgba(0,0,0,0.08); }
+.poison-result-item.hit { border-left: 3px solid #ef4444; }
+.poison-result-item.def { border-left: 3px solid #22c55e; }
+.poison-result-header { display: flex; align-items: center; gap: 10px; font-size: 13px; }
+.poison-badge { padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; color: #fff; }
+.poison-badge.hit { background: #ef4444; }
+.poison-badge.def { background: #22c55e; }
+.poison-case-id { font-family: monospace; color: #64748b; font-size: 12px; }
+.poison-case-summary { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.poison-case-time { color: #94a3b8; font-size: 11px; }
+.poison-result-detail { margin-top: 10px; padding-top: 10px; border-top: 1px solid #e2e8f0; }
+.detail-block { margin-bottom: 8px; }
+.detail-block b { font-size: 12px; color: #475569; }
+.detail-block pre { margin: 4px 0 0; padding: 8px; background: #f8fafc; border-radius: 4px; font-size: 12px; white-space: pre-wrap; word-break: break-all; max-height: 150px; overflow-y: auto; }
+.detail-meta { display: flex; gap: 16px; font-size: 11px; color: #94a3b8; }
 </style>

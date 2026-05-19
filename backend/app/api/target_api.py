@@ -111,10 +111,15 @@ async def remove_target(target_id: str):
 
 @router.post("/{target_id}/scan")
 async def start_scan(target_id: str, config: dict = None):
-    """对指定靶标发起扫描"""
+    """对指定靶标发起扫描（sandbox 模式走投毒流程）"""
     existing = await get_target_by_target_id(target_id)
     if not existing:
         raise HTTPException(status_code=404, detail="靶标不存在")
+
+    access_mode = existing.get("access_mode", "callback")
+
+    if access_mode == "sandbox":
+        return await _poison_test(target_id, existing, config)
 
     from app.core.fuzzer_engine import FuzzConfig, get_fuzzer_engine
     from app.core.payload_loader import PayloadLoader, AttackPayload
@@ -188,3 +193,106 @@ async def start_scan(target_id: str, config: dict = None):
     scan_task = await engine.start_scan(target, payloads, fuzz_config, scan_mode=scan_mode)
 
     return {"scan_id": scan_task.get("scan_id"), "status": "started"}
+
+
+async def _poison_test(target_id: str, target_data: dict, config: dict) -> dict:
+    """对沙箱靶标执行投毒测试，返回每条结果"""
+    import json, time, os, asyncio
+    import httpx
+    from pathlib import Path
+    from app.core.attack_judge import attack_judge
+
+    sandbox_url = os.getenv("SANDBOX_URL", "http://127.0.0.1:18080")
+    dataset_dir = Path("/app/dataset") if Path("/app/dataset").exists() else Path(__file__).resolve().parent.parent.parent.parent / "dataset"
+
+    dataset = (config or {}).get("dataset", "all")
+    max_cases = int((config or {}).get("max_cases", 0))
+    concurrency = int((config or {}).get("concurrency", 3))
+
+    file_map = {"test_cases": "test_cases.json", "prompt_attacks": "prompt_attacks_100.json", "adversarial": "adversarial_cases.json"}
+
+    cases = []
+    if dataset == "all":
+        for fname in file_map.values():
+            fpath = dataset_dir / fname
+            if fpath.exists():
+                with open(fpath, "r", encoding="utf-8") as f:
+                    cases.extend(json.load(f))
+    else:
+        fname = file_map.get(dataset)
+        if fname:
+            fpath = dataset_dir / fname
+            if fpath.exists():
+                with open(fpath, "r", encoding="utf-8") as f:
+                    cases = json.load(f)
+
+    if max_cases > 0:
+        cases = cases[:max_cases]
+
+    async with httpx.AsyncClient() as client:
+        try:
+            health = await client.get(f"{sandbox_url}/health", timeout=10.0)
+            if health.status_code != 200:
+                raise HTTPException(status_code=503, detail="Sandbox agent not responding")
+        except httpx.ConnectError:
+            raise HTTPException(status_code=503, detail="Sandbox agent not started")
+
+    semaphore = asyncio.Semaphore(concurrency)
+    results = []
+    success_count = 0
+    fail_count = 0
+
+    async def test_one(case):
+        async with semaphore:
+            async with httpx.AsyncClient() as client:
+                input_text = case.get("content", "")
+                start = time.time()
+                try:
+                    r = await client.post(
+                        f"{sandbox_url}/run",
+                        json={"input_text": input_text},
+                        timeout=httpx.Timeout(120.0, connect=30.0),
+                    )
+                    elapsed = (time.time() - start) * 1000
+                    if r.status_code == 200:
+                        trace = r.json().get("trace", {})
+                        final_output = trace.get("final_output", "")
+                        judgement = attack_judge.judge(input_text, trace)
+                        return {
+                            "case_id": case.get("id", ""),
+                            "input_text": input_text,
+                            "expected": case.get("expected_policy", case.get("expected", "")),
+                            "attack_success": judgement["attack_success"],
+                            "attack_type": judgement["attack_type"],
+                            "severity": judgement["severity"],
+                            "summary": judgement["summary"],
+                            "evidence": judgement["evidence"],
+                            "agent_output": final_output[:500],
+                            "elapsed_ms": round(elapsed),
+                        }
+                    else:
+                        return {"case_id": case.get("id", ""), "input_text": input_text, "attack_success": False, "severity": "error", "summary": f"HTTP {r.status_code}", "agent_output": "", "elapsed_ms": round(elapsed)}
+                except Exception as e:
+                    return {"case_id": case.get("id", ""), "input_text": input_text, "attack_success": False, "severity": "error", "summary": str(e)[:80], "agent_output": "", "elapsed_ms": round((time.time() - start) * 1000)}
+
+    for case in cases:
+        result = await test_one(case)
+        results.append(result)
+        if result["attack_success"]:
+            success_count += 1
+        else:
+            fail_count += 1
+        done = len(results)
+        if done % 10 == 0 or done == len(cases):
+            print(f"[PoisonTest] {done}/{len(cases)} HIT={success_count} DEF={fail_count}", flush=True)
+
+    total = len(results)
+    return {
+        "target_id": target_id,
+        "status": "completed",
+        "total": total,
+        "attack_success_count": success_count,
+        "defense_success_count": fail_count,
+        "attack_success_rate": round(success_count / max(total, 1) * 100, 1),
+        "results": results,
+    }
