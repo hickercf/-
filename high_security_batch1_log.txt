@@ -1,0 +1,3 @@
+[Batch 1/8] Dataset=advanced_1 (retry)
+  110 cases | HIT=3 DEF=107 | 262s
+Saved to high_security_batch1_retry.json

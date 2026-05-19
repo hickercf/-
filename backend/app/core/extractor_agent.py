@@ -6,7 +6,7 @@ from app.core.llm_client import chat_completion_text, safe_log
 
 load_dotenv()
 
-ENABLE_LLM = os.getenv("ENABLE_LLM", "false").lower() == "true"
+ENABLE_LLM = os.getenv("ENABLE_LLM", "true").lower() == "true"
 LLM_BASE_URL = os.getenv("LLM_BASE_URL", "https://api.deepseek.com/v1")
 LLM_MODEL = os.getenv("LLM_MODEL", "deepseek-chat")
 

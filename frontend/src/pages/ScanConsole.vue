@@ -73,26 +73,34 @@
         <div class="card">
           <h3>投毒配置</h3>
           <div class="form-group">
-            <label>数据集</label>
-            <select v-model="poisonConfig.dataset" :disabled="poisonRunning">
-              <option value="all">全部 (180条)</option>
-              <option value="test_cases">基础测试 (30条)</option>
-              <option value="prompt_attacks">Prompt攻击 (100条)</option>
-              <option value="adversarial">对抗样本 (50条)</option>
+            <label>测试规模</label>
+            <select v-model="poisonConfig.batchPreset" :disabled="poisonRunning">
+              <option value="small">小批量测试 (30条)</option>
+              <option value="medium">中批量测试 (300条)</option>
+              <option value="large">大批量测试 (800条)</option>
             </select>
-          </div>
-          <div class="form-group">
-            <label>最大用例数 (0=全部)</label>
-            <input type="number" v-model.number="poisonConfig.max_cases" min="0" :disabled="poisonRunning" />
           </div>
           <div class="form-group">
             <label>并发数</label>
             <input type="number" v-model.number="poisonConfig.concurrency" min="1" max="10" :disabled="poisonRunning" />
           </div>
           <button class="btn-primary btn-block" @click="startPoisonTest" :disabled="!selectedTarget || poisonRunning">
-            {{ poisonRunning ? `测试中... (${poisonProgress.done}/${poisonProgress.total})` : '开始投毒测试' }}
+            {{ poisonRunning ? `测试中... (${poisonProgress.percent}%)` : '开始投毒测试' }}
           </button>
           <button v-if="poisonRunning" class="btn-secondary btn-block" style="margin-top:6px" @click="poisonRunning = false">停止</button>
+        </div>
+
+        <!-- 投毒进度 -->
+        <div v-if="poisonRunning || poisonProgress.percent > 0" class="card">
+          <h3>测试进度</h3>
+          <div class="progress-bar-wrap">
+            <div class="progress-bar" :style="{ width: poisonProgress.percent + '%' }"></div>
+          </div>
+          <div class="progress-info">
+            <span>{{ poisonProgress.done }} / {{ poisonProgress.total }} 条</span>
+            <span>{{ poisonProgress.percent }}%</span>
+            <span>已用 {{ poisonProgress.elapsedSec }}s</span>
+          </div>
         </div>
 
         <!-- 投毒结果统计 -->
@@ -312,7 +320,7 @@ export default {
     const expandedCase = ref(null)
     const poisonProgress = reactive({ done: 0, total: 0 })
     const poisonReport = reactive({ total: 0, attack_success_count: 0, defense_success_count: 0, attack_success_rate: 0 })
-    const poisonConfig = reactive({ dataset: 'all', max_cases: 20, concurrency: 3 })
+    const poisonConfig = reactive({ batchPreset: 'small', concurrency: 3 })
     let ws = null
     let pollTimer = null
 
@@ -502,27 +510,54 @@ export default {
 
     const startPoisonTest = async () => {
       if (!selectedTarget.value) return
+      const presetMap = {
+        small: { dataset: 'test_cases', max_cases: 30 },
+        medium: { dataset: 'advanced', max_cases: 300 },
+        large: { dataset: 'advanced', max_cases: 800 },
+      }
+      const preset = presetMap[poisonConfig.batchPreset]
+      if (!preset) {
+        errorMessage.value = '请选择测试规模'
+        return
+      }
+
       poisonRunning.value = true
       poisonResults.value = []
       expandedCase.value = null
       poisonProgress.done = 0
-      poisonProgress.total = 0
+      poisonProgress.total = preset.max_cases
+      poisonProgress.percent = 0
+      poisonProgress.elapsedSec = 0
       errorMessage.value = ''
+
+      const secPerCase = 1.8
+      const estimatedTotalSec = preset.max_cases * secPerCase / poisonConfig.concurrency
+      const startTime = Date.now()
+      let timer = null
+      timer = setInterval(() => {
+        const elapsed = (Date.now() - startTime) / 1000
+        poisonProgress.elapsedSec = Math.floor(elapsed)
+        const estimatedPercent = Math.min((elapsed / estimatedTotalSec) * 100, 95)
+        poisonProgress.percent = Math.floor(estimatedPercent)
+      }, 300)
+
       try {
         const data = await startTargetScan(selectedTarget.value, {
           scan_mode: 'standard',
-          dataset: poisonConfig.dataset,
-          max_cases: poisonConfig.max_cases,
+          dataset: preset.dataset,
+          max_cases: preset.max_cases,
           concurrency: poisonConfig.concurrency,
         })
+        clearInterval(timer)
+        poisonProgress.percent = 100
+        poisonProgress.done = data.total
         poisonResults.value = data.results || []
         poisonReport.total = data.total
         poisonReport.attack_success_count = data.attack_success_count
         poisonReport.defense_success_count = data.defense_success_count
         poisonReport.attack_success_rate = data.attack_success_rate
-        poisonProgress.done = data.total
-        poisonProgress.total = data.total
       } catch (e) {
+        clearInterval(timer)
         errorMessage.value = '投毒测试失败: ' + (e.response?.data?.detail || e.message)
       } finally {
         poisonRunning.value = false
@@ -584,7 +619,8 @@ export default {
 
 .progress-bar-wrap { background: #e2e8f0; border-radius: 8px; height: 12px; overflow: hidden; margin-bottom: 10px; }
 .progress-bar { background: linear-gradient(90deg, #2563eb, #7c3aed); height: 100%; transition: width 0.5s; border-radius: 8px; }
-.progress-info { display: flex; justify-content: space-between; font-size: 13px; color: #64748b; }
+.progress-info { display: flex; justify-content: space-between; font-size: 13px; color: #64748b; gap: 12px; }
+.progress-info span { white-space: nowrap; }
 .vuln-count { color: #dc2626; }
 
 .result-item { padding: 10px; margin-bottom: 8px; background: #f8fafc; border-radius: 6px; border-left: 3px solid #e2e8f0; }

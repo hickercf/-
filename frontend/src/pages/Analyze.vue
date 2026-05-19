@@ -65,6 +65,86 @@
         <p class="reason-text"><strong>原因：</strong>{{ result.reason }}</p>
         <p class="reason-text"><strong>建议：</strong>{{ result.suggestion }}</p>
       </div>
+
+      <!-- Agent 多智能体分析详情 -->
+      <div v-if="agentAnalysis" class="card agent-analysis-card">
+        <h3>Agent 多智能体分析详情</h3>
+        <div class="agent-meta">
+          <span class="agent-badge">参与 Agent: {{ agentAnalysis.agents_involved?.join(', ') || '-' }}</span>
+          <span class="latency-badge">耗时: {{ agentAnalysis.total_latency_ms }}ms</span>
+        </div>
+
+        <div v-if="agentAnalysis.risk_analysis" class="agent-section">
+          <h4>风险分析 (Risk Analyst)</h4>
+          <div class="agent-field">
+            <span class="field-label">攻击向量:</span>
+            <span class="field-value">{{ agentAnalysis.risk_analysis.attack_vectors?.join(', ') || '-' }}</span>
+          </div>
+          <div class="agent-field">
+            <span class="field-label">风险传导链:</span>
+            <span class="field-value">{{ agentAnalysis.risk_analysis.risk_chain?.join(' -> ') || '-' }}</span>
+          </div>
+          <div class="agent-field">
+            <span class="field-label">关键风险指标:</span>
+            <span class="field-value">{{ agentAnalysis.risk_analysis.key_indicators?.join(', ') || '-' }}</span>
+          </div>
+          <div class="agent-field">
+            <span class="field-label">攻击模式对比:</span>
+            <span class="field-value">{{ agentAnalysis.risk_analysis.comparison || '-' }}</span>
+          </div>
+          <div class="agent-field">
+            <span class="field-label">严重度评估:</span>
+            <span :class="['severity-badge', agentAnalysis.risk_analysis.severity_assessment]">{{ agentAnalysis.risk_analysis.severity_assessment || 'unknown' }}</span>
+            <span class="confidence-badge">置信度: {{ Math.round((agentAnalysis.risk_analysis.confidence || 0) * 100) }}%</span>
+          </div>
+          <div class="agent-field">
+            <span class="field-label">Agent 原始评分:</span>
+            <span class="field-value score">{{ agentAnalysis.risk_analysis.risk_score }}/100</span>
+          </div>
+        </div>
+
+        <div v-if="agentAnalysis.policy_advice" class="agent-section">
+          <h4>策略建议 (Policy Advisor)</h4>
+          <div class="agent-field">
+            <span class="field-label">建议策略:</span>
+            <span :class="['policy-badge', agentAnalysis.policy_advice.policy_action]">{{ agentAnalysis.policy_advice.policy_action?.toUpperCase() || '-' }}</span>
+          </div>
+          <div class="agent-field">
+            <span class="field-label">策略理由:</span>
+            <span class="field-value">{{ agentAnalysis.policy_advice.policy_reason || '-' }}</span>
+          </div>
+          <div v-if="agentAnalysis.policy_advice.immediate_actions?.length" class="agent-list">
+            <span class="field-label">立即行动:</span>
+            <ul>
+              <li v-for="(item, idx) in agentAnalysis.policy_advice.immediate_actions" :key="idx">{{ item }}</li>
+            </ul>
+          </div>
+          <div v-if="agentAnalysis.policy_advice.remediation_steps?.length" class="agent-list">
+            <span class="field-label">修复步骤:</span>
+            <ul>
+              <li v-for="(item, idx) in agentAnalysis.policy_advice.remediation_steps" :key="idx">{{ item }}</li>
+            </ul>
+          </div>
+          <div v-if="agentAnalysis.policy_advice.long_term_measures?.length" class="agent-list">
+            <span class="field-label">长期措施:</span>
+            <ul>
+              <li v-for="(item, idx) in agentAnalysis.policy_advice.long_term_measures" :key="idx">{{ item }}</li>
+            </ul>
+          </div>
+          <div v-if="agentAnalysis.policy_advice.detection_rules?.length" class="agent-list">
+            <span class="field-label">检测规则建议:</span>
+            <ul>
+              <li v-for="(item, idx) in agentAnalysis.policy_advice.detection_rules" :key="idx">{{ item }}</li>
+            </ul>
+          </div>
+        </div>
+
+        <div v-if="agentAnalysis.orchestrator_decision" class="agent-section">
+          <h4>协调器裁决 (Orchestrator)</h4>
+          <p class="orchestrator-text">{{ agentAnalysis.orchestrator_decision }}</p>
+        </div>
+      </div>
+
       <div class="card evidence-card">
         <h3>可信存证</h3>
         <div class="hash-row"><span class="hash-label">记录哈希：</span><code>{{ result.record_hash }}</code></div>
@@ -205,6 +285,11 @@ export default {
       return map[result.value.policy_decision?.action] || ''
     })
 
+    const agentAnalysis = computed(() => {
+      if (!result.value) return null
+      return result.value.behavior_chain?.multi_agent_analysis || null
+    })
+
     function applySample(s) {
       form.value.content = s.content
       form.value.inferred_type = s.input_type || inferInputType(s.content)
@@ -260,7 +345,7 @@ export default {
       }
     }
 
-    return { form, loading, result, sampleGroups, riskClass, policyLabel, applySample, doAnalyze, exportReport }
+    return { form, loading, result, sampleGroups, riskClass, policyLabel, agentAnalysis, applySample, doAnalyze, exportReport }
   }
 }
 </script>
@@ -331,4 +416,33 @@ textarea:focus { outline: none; border-color: #1890ff; }
 .empty-hint { font-size: 12px; opacity: 0.6; }
 .empty { display: flex; align-items: center; justify-content: center; }
 .empty-text { color: #999; font-size: 13px; }
+
+.agent-analysis-card { background: linear-gradient(135deg, #f8faff, #f0f5ff); border: 1px solid #d6e4ff; }
+.agent-analysis-card h3 { color: #1d39c4; border-bottom-color: #d6e4ff; }
+.agent-meta { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+.agent-badge { font-size: 12px; background: #e6f0ff; color: #1d39c4; padding: 3px 10px; border-radius: 4px; }
+.latency-badge { font-size: 12px; background: #f0f0f0; color: #666; padding: 3px 10px; border-radius: 4px; }
+.agent-section { margin-bottom: 16px; padding-bottom: 14px; border-bottom: 1px dashed #d6e4ff; }
+.agent-section:last-child { margin-bottom: 0; padding-bottom: 0; border-bottom: none; }
+.agent-section h4 { font-size: 13px; color: #1d39c4; margin: 0 0 10px; font-weight: 600; }
+.agent-field { display: flex; gap: 8px; margin-bottom: 8px; font-size: 13px; line-height: 1.6; }
+.field-label { color: #666; font-weight: 600; white-space: nowrap; min-width: 90px; }
+.field-value { color: #333; flex: 1; }
+.field-value.score { font-weight: 700; color: #f5222d; }
+.severity-badge { font-size: 11px; padding: 2px 8px; border-radius: 3px; font-weight: 600; text-transform: uppercase; }
+.severity-badge.critical { background: #fff1f0; color: #f5222d; }
+.severity-badge.high { background: #fff7e6; color: #fa8c16; }
+.severity-badge.medium { background: #fffbe6; color: #faad14; }
+.severity-badge.low { background: #f6ffed; color: #52c41a; }
+.severity-badge.unknown { background: #f5f5f5; color: #999; }
+.confidence-badge { font-size: 11px; color: #666; margin-left: 8px; background: #f5f5f5; padding: 2px 8px; border-radius: 3px; }
+.policy-badge { font-size: 12px; padding: 2px 10px; border-radius: 3px; font-weight: 700; }
+.policy-badge.pass { background: #f6ffed; color: #52c41a; }
+.policy-badge.warn { background: #fffbe6; color: #faad14; }
+.policy-badge.review { background: #fff7e6; color: #fa8c16; }
+.policy-badge.block { background: #fff1f0; color: #f5222d; }
+.agent-list { margin-bottom: 10px; font-size: 13px; }
+.agent-list ul { margin: 4px 0 0; padding-left: 18px; color: #555; }
+.agent-list li { margin-bottom: 3px; }
+.orchestrator-text { font-size: 13px; color: #555; line-height: 1.7; margin: 0; }
 </style>

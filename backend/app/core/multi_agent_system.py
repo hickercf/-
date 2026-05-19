@@ -38,8 +38,8 @@ def _retry_with_backoff(max_retries=3, base_delay=1.0):
 
 load_dotenv()
 
-ENABLE_LLM = os.getenv("ENABLE_LLM", "false").lower() == "true"
-ENABLE_MULTI_AGENT = os.getenv("ENABLE_MULTI_AGENT", "false").lower() == "true"
+ENABLE_LLM = os.getenv("ENABLE_LLM", "true").lower() == "true"
+ENABLE_MULTI_AGENT = os.getenv("ENABLE_MULTI_AGENT", "true").lower() == "true"
 LLM_API_KEY = os.getenv("LLM_API_KEY", "")
 LLM_BASE_URL = os.getenv("LLM_BASE_URL", "https://api.deepseek.com/v1")
 LLM_MODEL = os.getenv("LLM_MODEL", "deepseek-chat")

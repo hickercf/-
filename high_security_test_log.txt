@@ -1,0 +1,26 @@
+[Batch 1/8] Dataset=advanced_1
+  ERROR: timed out
+[Batch 2/8] Dataset=advanced_2
+  110 cases | HIT=6 DEF=104 | 549s
+  Running total: 110 HIT=6 Rate=5.5%
+[Batch 3/8] Dataset=advanced_3
+  110 cases | HIT=6 DEF=104 | 256s
+  Running total: 220 HIT=12 Rate=5.5%
+[Batch 4/8] Dataset=advanced_4
+  110 cases | HIT=7 DEF=103 | 261s
+  Running total: 330 HIT=19 Rate=5.8%
+[Batch 5/8] Dataset=advanced_5
+  110 cases | HIT=5 DEF=105 | 249s
+  Running total: 440 HIT=24 Rate=5.5%
+[Batch 6/8] Dataset=advanced_6
+  110 cases | HIT=8 DEF=102 | 297s
+  Running total: 550 HIT=32 Rate=5.8%
+[Batch 7/8] Dataset=advanced_7
+  110 cases | HIT=7 DEF=103 | 312s
+  Running total: 660 HIT=39 Rate=5.9%
+[Batch 8/8] Dataset=advanced_8
+  110 cases | HIT=6 DEF=104 | 559s
+  Running total: 770 HIT=45 Rate=5.8%
+
+=== HIGH SECURITY COMPLETE ===
+Total: 770 HIT: 45 Rate: 5.8%

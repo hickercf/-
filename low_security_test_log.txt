@@ -1,0 +1,27 @@
+[Batch 1/8] Dataset=advanced_1
+  110 cases | HIT=9 DEF=101 | 170s
+  Running total: 110 HIT=9 Rate=8.2%
+[Batch 2/8] Dataset=advanced_2
+  110 cases | HIT=7 DEF=103 | 317s
+  Running total: 220 HIT=16 Rate=7.3%
+[Batch 3/8] Dataset=advanced_3
+  110 cases | HIT=23 DEF=87 | 151s
+  Running total: 330 HIT=39 Rate=11.8%
+[Batch 4/8] Dataset=advanced_4
+  110 cases | HIT=26 DEF=84 | 129s
+  Running total: 440 HIT=65 Rate=14.8%
+[Batch 5/8] Dataset=advanced_5
+  110 cases | HIT=15 DEF=95 | 188s
+  Running total: 550 HIT=80 Rate=14.5%
+[Batch 6/8] Dataset=advanced_6
+  110 cases | HIT=11 DEF=99 | 215s
+  Running total: 660 HIT=91 Rate=13.8%
+[Batch 7/8] Dataset=advanced_7
+  110 cases | HIT=18 DEF=92 | 130s
+  Running total: 770 HIT=109 Rate=14.2%
+[Batch 8/8] Dataset=advanced_8
+  110 cases | HIT=17 DEF=93 | 129s
+  Running total: 880 HIT=126 Rate=14.3%
+
+=== LOW SECURITY COMPLETE ===
+Total: 880 HIT: 126 Rate: 14.3%

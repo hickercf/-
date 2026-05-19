@@ -202,7 +202,9 @@ async def _poison_test(target_id: str, target_data: dict, config: dict) -> dict:
     from pathlib import Path
     from app.core.attack_judge import attack_judge
 
-    sandbox_url = os.getenv("SANDBOX_URL", "http://127.0.0.1:18080")
+    # 支持从 target 的 access_config 中读取自定义 sandbox_url，实现多安全等级 Agent 测试
+    access_config = target_data.get("access_config", {})
+    sandbox_url = access_config.get("sandbox_url") or os.getenv("SANDBOX_URL", "http://127.0.0.1:18080")
     dataset_dir = Path("/app/dataset") if Path("/app/dataset").exists() else Path(__file__).resolve().parent.parent.parent.parent / "dataset"
 
     dataset = (config or {}).get("dataset", "all")
