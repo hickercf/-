@@ -12,8 +12,8 @@ services:
       - SANDBOX_MODE=true
       - PYTHONUNBUFFERED=1
       - LLM_API_KEY=${LLM_API_KEY:-}
-      - LLM_BASE_URL=${LLM_BASE_URL:-https://open.bigmodel.cn/api/paas/v4}
-      - LLM_MODEL=${LLM_MODEL:-glm-4-flash}
+      - LLM_BASE_URL=${LLM_BASE_URL:-https://api.siliconflow.cn/v1}
+      - LLM_MODEL=${LLM_MODEL:-Qwen/Qwen2.5-7B-Instruct}
       - LLM_TIMEOUT=${LLM_TIMEOUT:-90}
       - LLM_CONNECT_TIMEOUT=${LLM_CONNECT_TIMEOUT:-45}
     read_only: false

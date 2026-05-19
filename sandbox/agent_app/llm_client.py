@@ -1,7 +1,7 @@
 """
 sandbox/agent_app/llm_client.py — 沙箱 Agent 的 LLM 客户端
 
-使用 httpx 直接调用 DeepSeek API。
+使用 httpx 直接调用 SiliconFlow API（qwen-2.5-7b）。
 """
 import os
 import httpx
@@ -10,8 +10,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 LLM_API_KEY = os.getenv("LLM_API_KEY", "")
-LLM_BASE_URL = os.getenv("LLM_BASE_URL", "https://api.deepseek.com/v1")
-LLM_MODEL = os.getenv("LLM_MODEL", "deepseek-chat")
+LLM_BASE_URL = os.getenv("LLM_BASE_URL", "https://api.siliconflow.cn/v1")
+LLM_MODEL = os.getenv("LLM_MODEL", "Qwen/Qwen2.5-7B-Instruct")
 LLM_TIMEOUT = float(os.getenv("LLM_TIMEOUT", "90"))
 LLM_CONNECT_TIMEOUT = float(os.getenv("LLM_CONNECT_TIMEOUT", "45"))
 
