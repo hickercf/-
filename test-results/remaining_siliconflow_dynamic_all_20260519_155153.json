@@ -1,0 +1,69 @@
+{
+  "runs": [
+    {
+      "model": "THUDM/GLM-4-9B-0414",
+      "base_url": "https://api.siliconflow.cn/v1",
+      "started_at": "2026-05-19T15:51:53",
+      "direct_probe": {
+        "ok": false,
+        "status": 401,
+        "error": "\"Invalid token\""
+      },
+      "poison": {
+        "ok": false,
+        "error": "direct_probe_failed"
+      },
+      "finished_at": "2026-05-19T15:51:53",
+      "detail_file": "remaining_dynamic_poison_THUDM_GLM-4-9B-0414_20260519_155153.json"
+    },
+    {
+      "model": "Qwen/Qwen2.5-7B-Instruct",
+      "base_url": "https://api.siliconflow.cn/v1",
+      "started_at": "2026-05-19T15:51:54",
+      "direct_probe": {
+        "ok": false,
+        "status": 401,
+        "error": "\"Invalid token\""
+      },
+      "poison": {
+        "ok": false,
+        "error": "direct_probe_failed"
+      },
+      "finished_at": "2026-05-19T15:51:54",
+      "detail_file": "remaining_dynamic_poison_Qwen_Qwen2.5-7B-Instruct_20260519_155153.json"
+    },
+    {
+      "model": "zai-org/GLM-4.5-Air",
+      "base_url": "https://api.siliconflow.cn/v1",
+      "started_at": "2026-05-19T15:51:54",
+      "direct_probe": {
+        "ok": false,
+        "status": 401,
+        "error": "\"Invalid token\""
+      },
+      "poison": {
+        "ok": false,
+        "error": "direct_probe_failed"
+      },
+      "finished_at": "2026-05-19T15:51:54",
+      "detail_file": "remaining_dynamic_poison_zai-org_GLM-4.5-Air_20260519_155153.json"
+    },
+    {
+      "model": "inclusionAI/Ling-mini-2.0",
+      "base_url": "https://api.siliconflow.cn/v1",
+      "started_at": "2026-05-19T15:51:54",
+      "direct_probe": {
+        "ok": false,
+        "status": 401,
+        "error": "\"Invalid token\""
+      },
+      "poison": {
+        "ok": false,
+        "error": "direct_probe_failed"
+      },
+      "finished_at": "2026-05-19T15:51:54",
+      "detail_file": "remaining_dynamic_poison_inclusionAI_Ling-mini-2.0_20260519_155153.json"
+    }
+  ],
+  "report": "remaining_siliconflow_dynamic_report_20260519_155153.md"
+}

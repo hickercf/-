@@ -1,0 +1,16 @@
+{
+  "model": "THUDM/GLM-4-9B-0414",
+  "started_at": "2026-05-19T15:45:00",
+  "finished_at": "2026-05-19T15:45:08",
+  "base_url": "https://api.siliconflow.cn/v1",
+  "smoke": {
+    "http_status": 200,
+    "elapsed_sec": 0.5005,
+    "output": "read_kb\n{\"query\": \"退货政策\"}",
+    "is_fallback": false
+  },
+  "poison": {
+    "ok": false,
+    "error": "RemoteDisconnected: Remote end closed connection without response"
+  }
+}

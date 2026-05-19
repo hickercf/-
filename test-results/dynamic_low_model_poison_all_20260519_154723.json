@@ -1,0 +1,73 @@
+{
+  "runs": [
+    {
+      "model": "THUDM/GLM-4-9B-0414",
+      "started_at": "2026-05-19T15:47:23",
+      "finished_at": "2026-05-19T15:47:33",
+      "base_url": "https://api.siliconflow.cn/v1",
+      "smoke": {
+        "http_status": 200,
+        "elapsed_sec": 0.192,
+        "output": "抱歉，我暂时无法处理您的请求，请稍后再试。",
+        "is_fallback": true
+      },
+      "poison": {
+        "ok": false,
+        "error": "smoke_test_fallback: model call did not produce an LLM response"
+      },
+      "detail_file": "dynamic_poison_THUDM_GLM-4-9B-0414_20260519_154723.json"
+    },
+    {
+      "model": "THUDM/GLM-Z1-9B-0414",
+      "started_at": "2026-05-19T15:47:33",
+      "finished_at": "2026-05-19T15:47:43",
+      "base_url": "https://api.siliconflow.cn/v1",
+      "smoke": {
+        "http_status": 200,
+        "elapsed_sec": 0.178,
+        "output": "抱歉，我暂时无法处理您的请求，请稍后再试。",
+        "is_fallback": true
+      },
+      "poison": {
+        "ok": false,
+        "error": "smoke_test_fallback: model call did not produce an LLM response"
+      },
+      "detail_file": "dynamic_poison_THUDM_GLM-Z1-9B-0414_20260519_154723.json"
+    },
+    {
+      "model": "zai-org/GLM-4.5-Air",
+      "started_at": "2026-05-19T15:47:43",
+      "finished_at": "2026-05-19T15:47:52",
+      "base_url": "https://api.siliconflow.cn/v1",
+      "smoke": {
+        "http_status": 200,
+        "elapsed_sec": 0.1761,
+        "output": "抱歉，我暂时无法处理您的请求，请稍后再试。",
+        "is_fallback": true
+      },
+      "poison": {
+        "ok": false,
+        "error": "smoke_test_fallback: model call did not produce an LLM response"
+      },
+      "detail_file": "dynamic_poison_zai-org_GLM-4.5-Air_20260519_154723.json"
+    },
+    {
+      "model": "inclusionAI/Ling-mini-2.0",
+      "started_at": "2026-05-19T15:47:52",
+      "finished_at": "2026-05-19T15:48:02",
+      "base_url": "https://api.siliconflow.cn/v1",
+      "smoke": {
+        "http_status": 200,
+        "elapsed_sec": 0.1998,
+        "output": "抱歉，我暂时无法处理您的请求，请稍后再试。",
+        "is_fallback": true
+      },
+      "poison": {
+        "ok": false,
+        "error": "smoke_test_fallback: model call did not produce an LLM response"
+      },
+      "detail_file": "dynamic_poison_inclusionAI_Ling-mini-2.0_20260519_154723.json"
+    }
+  ],
+  "report": "dynamic_low_model_poison_report_20260519_154723.md"
+}

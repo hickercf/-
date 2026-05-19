@@ -1,0 +1,15 @@
+{
+  "model": "inclusionAI/Ling-mini-2.0",
+  "base_url": "https://api.siliconflow.cn/v1",
+  "started_at": "2026-05-19T15:51:54",
+  "direct_probe": {
+    "ok": false,
+    "status": 401,
+    "error": "\"Invalid token\""
+  },
+  "poison": {
+    "ok": false,
+    "error": "direct_probe_failed"
+  },
+  "finished_at": "2026-05-19T15:51:54"
+}

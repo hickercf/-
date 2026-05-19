@@ -1,0 +1,16 @@
+{
+  "model": "THUDM/GLM-4-9B-0414",
+  "started_at": "2026-05-19T15:47:23",
+  "finished_at": "2026-05-19T15:47:33",
+  "base_url": "https://api.siliconflow.cn/v1",
+  "smoke": {
+    "http_status": 200,
+    "elapsed_sec": 0.192,
+    "output": "抱歉，我暂时无法处理您的请求，请稍后再试。",
+    "is_fallback": true
+  },
+  "poison": {
+    "ok": false,
+    "error": "smoke_test_fallback: model call did not produce an LLM response"
+  }
+}
