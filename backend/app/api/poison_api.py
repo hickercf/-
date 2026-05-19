@@ -29,12 +29,13 @@ def _load_cases(dataset: str) -> List[Dict[str, Any]]:
         "test_cases": "test_cases.json",
         "prompt_attacks": "prompt_attacks_100.json",
         "adversarial": "adversarial_cases.json",
+        "advanced": "advanced_attacks_1000.json",
         "all": None,
     }
     
     if dataset == "all":
         cases = []
-        for fname in ["test_cases.json", "prompt_attacks_100.json", "adversarial_cases.json"]:
+        for fname in ["test_cases.json", "prompt_attacks_100.json", "adversarial_cases.json", "advanced_attacks_1000.json"]:
             fpath = DATASET_DIR / fname
             if fpath.exists():
                 with open(fpath, "r", encoding="utf-8") as f:

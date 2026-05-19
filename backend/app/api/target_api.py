@@ -209,7 +209,7 @@ async def _poison_test(target_id: str, target_data: dict, config: dict) -> dict:
     max_cases = int((config or {}).get("max_cases", 0))
     concurrency = int((config or {}).get("concurrency", 3))
 
-    file_map = {"test_cases": "test_cases.json", "prompt_attacks": "prompt_attacks_100.json", "adversarial": "adversarial_cases.json"}
+    file_map = {"test_cases": "test_cases.json", "prompt_attacks": "prompt_attacks_100.json", "adversarial": "adversarial_cases.json", "advanced": "advanced_attacks_1000.json", "advanced_1": "advanced_1.json", "advanced_2": "advanced_2.json", "advanced_3": "advanced_3.json", "advanced_4": "advanced_4.json", "advanced_5": "advanced_5.json", "advanced_6": "advanced_6.json", "advanced_7": "advanced_7.json", "advanced_8": "advanced_8.json"}
 
     cases = []
     if dataset == "all":
@@ -231,11 +231,13 @@ async def _poison_test(target_id: str, target_data: dict, config: dict) -> dict:
 
     async with httpx.AsyncClient() as client:
         try:
-            health = await client.get(f"{sandbox_url}/health", timeout=10.0)
+            health = await client.get(f"{sandbox_url}/health", timeout=30.0)
             if health.status_code != 200:
                 raise HTTPException(status_code=503, detail="Sandbox agent not responding")
         except httpx.ConnectError:
             raise HTTPException(status_code=503, detail="Sandbox agent not started")
+        except httpx.ReadTimeout:
+            pass  # sandbox busy, continue anyway
 
     semaphore = asyncio.Semaphore(concurrency)
     results = []
@@ -273,10 +275,13 @@ async def _poison_test(target_id: str, target_data: dict, config: dict) -> dict:
                     else:
                         return {"case_id": case.get("id", ""), "input_text": input_text, "attack_success": False, "severity": "error", "summary": f"HTTP {r.status_code}", "agent_output": "", "elapsed_ms": round(elapsed)}
                 except Exception as e:
-                    return {"case_id": case.get("id", ""), "input_text": input_text, "attack_success": False, "severity": "error", "summary": str(e)[:80], "agent_output": "", "elapsed_ms": round((time.time() - start) * 1000)}
+                    err_type = type(e).__name__
+                    safe_msg = {"ConnectError": "sandbox连接失败", "ReadTimeout": "请求超时", "TimeoutException": "请求超时"}.get(err_type, f"请求异常[{err_type}]")
+                    return {"case_id": case.get("id", ""), "input_text": input_text, "attack_success": False, "severity": "error", "summary": safe_msg, "agent_output": "", "elapsed_ms": round((time.time() - start) * 1000)}
 
-    for case in cases:
-        result = await test_one(case)
+    tasks = [test_one(case) for case in cases]
+    for coro in asyncio.as_completed(tasks):
+        result = await coro
         results.append(result)
         if result["attack_success"]:
             success_count += 1

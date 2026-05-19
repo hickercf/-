@@ -47,6 +47,7 @@ class DefenseAnalyzer:
 
     def __init__(self):
         self._rules = None
+        self._max_scan_length = 5000
         self._sensitive_patterns = [
             re.compile(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'),
             re.compile(r'\b\d{15,19}\b'),
@@ -141,7 +142,7 @@ class DefenseAnalyzer:
 
             for step in steps:
                 step_idx = step.get("step_index", 0)
-                content = self._get_field_content(step, field)
+                content = self._get_field_content(step, field)[:self._max_scan_length]
 
                 matched = False
                 if method == "keyword_match":
@@ -384,7 +385,8 @@ class DefenseAnalyzer:
             action = step.get("action", "")
 
             for pattern in self._sensitive_patterns:
-                matches = pattern.findall(observation + " " + str(step.get("action_input", "")))
+                scan_text = (observation + " " + str(step.get("action_input", "")))[:self._max_scan_length]
+                matches = pattern.findall(scan_text)
                 if matches:
                     breaches.append(DefenseBreach(
                         layer="L4",
